@@ -8,6 +8,9 @@ build/
 .env
 results/
 
+# Instructor-only material: never published to the (public) remote.
+docs/instructor/
+
 .pytest_cache/
 .coverage
 htmlcov/
