@@ -29,12 +29,51 @@ jitter = true
 [concurrency]
 max_concurrent_requests = 5
 
-# Pricing is USD per 1,000,000 tokens. These are PLACEHOLDERS.
-# They MUST be verified against the live Groq pricing page
-# (https://groq.com/pricing) immediately before any lab that relies on
-# cost calculation (Lab01, Lab04, Lab09) is implemented or run live.
+# Pricing is USD per 1,000,000 tokens.
+#
+# These numbers were cross-checked against several third-party Groq pricing
+# trackers (morphllm.com/groq-pricing, cloudzero.com/blog/groq-pricing,
+# trevorfox.com's per-model calculators) on price_verified_date below, which
+# agreed with each other. They were NOT confirmed by scraping Groq's own
+# pricing page directly (it is JS-rendered and could not be read as static
+# content during this project's research). RE-VERIFY against
+# https://groq.com/pricing or https://console.groq.com/docs/models before
+# relying on these for any real financial decision -- prices change, and
+# this project's own safety rails (live_api_enabled + --live) are what
+# actually protect against unwanted spend, not these numbers.
 [pricing.models."llama-3.1-8b-instant"]
-input_per_1m_usd = 0.0   # VERIFY-BEFORE-LIVE-RUN
-output_per_1m_usd = 0.0  # VERIFY-BEFORE-LIVE-RUN
-cached_input_per_1m_usd = 0.0 # VERIFY-BEFORE-LIVE-RUN - not all models support caching
-price_verified_date = "" # fill in (YYYY-MM-DD) when numbers below are confirmed
+input_per_1m_usd = 0.05
+output_per_1m_usd = 0.08
+cached_input_per_1m_usd = 0.0 # not a caching-capable model (see lab03.caching_capable_models)
+price_verified_date = "2026-10-21"
+
+[pricing.models."llama-3.3-70b-versatile"]
+input_per_1m_usd = 0.59
+output_per_1m_usd = 0.79
+cached_input_per_1m_usd = 0.0 # not a caching-capable model
+price_verified_date = "2026-10-21"
+
+# Prompt caching (Lab03) is currently only supported on these three models.
+[pricing.models."openai/gpt-oss-20b"]
+input_per_1m_usd = 0.075
+output_per_1m_usd = 0.30
+cached_input_per_1m_usd = 0.0375
+price_verified_date = "2026-10-21"
+
+[pricing.models."openai/gpt-oss-120b"]
+input_per_1m_usd = 0.15
+output_per_1m_usd = 0.60
+cached_input_per_1m_usd = 0.075
+price_verified_date = "2026-10-21"
+
+[lab05]
+# Small/fast vs large/capable model pair used by the model-routing experiments.
+small_model = "llama-3.1-8b-instant"
+large_model = "llama-3.3-70b-versatile"
+
+[lab03]
+# Prompt caching is only supported on these Groq models today (Oct 2026).
+caching_capable_models = ["openai/gpt-oss-20b", "openai/gpt-oss-120b"]
+
+[lab09]
+batch_completion_window = "24h"

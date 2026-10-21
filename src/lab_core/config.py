@@ -53,6 +53,22 @@ class ModelPricing:
 
 
 @dataclass(frozen=True)
+class Lab05Config:
+    small_model: str
+    large_model: str
+
+
+@dataclass(frozen=True)
+class Lab03Config:
+    caching_capable_models: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class Lab09Config:
+    batch_completion_window: str
+
+
+@dataclass(frozen=True)
 class AppConfig:
     groq: GroqConfig
     execution: ExecutionConfig
@@ -60,6 +76,9 @@ class AppConfig:
     retry: RetryConfig
     concurrency: ConcurrencyConfig
     pricing: dict[str, ModelPricing]
+    lab03: Lab03Config
+    lab05: Lab05Config
+    lab09: Lab09Config
 
 
 def _require(section: dict, key: str, section_name: str) -> object:
@@ -146,6 +165,29 @@ def _build_pricing(raw: dict) -> dict[str, ModelPricing]:
     return pricing
 
 
+def _build_lab03(raw: dict) -> Lab03Config:
+    section = raw.get("lab03", {})
+    models = _require(section, "caching_capable_models", "lab03")
+    if not isinstance(models, list) or not all(isinstance(m, str) for m in models):
+        raise ConfigError("lab03.caching_capable_models must be a list of strings")
+    return Lab03Config(caching_capable_models=tuple(models))
+
+
+def _build_lab05(raw: dict) -> Lab05Config:
+    section = raw.get("lab05", {})
+    return Lab05Config(
+        small_model=str(_require(section, "small_model", "lab05")),
+        large_model=str(_require(section, "large_model", "lab05")),
+    )
+
+
+def _build_lab09(raw: dict) -> Lab09Config:
+    section = raw.get("lab09", {})
+    return Lab09Config(
+        batch_completion_window=str(_require(section, "batch_completion_window", "lab09")),
+    )
+
+
 def load_config(path: Path | None = None) -> AppConfig:
     """Load and validate the TOML configuration at `path` (default: config/default.toml)."""
     config_path = path if path is not None else DEFAULT_CONFIG_PATH
@@ -159,4 +201,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         retry=_build_retry(raw),
         concurrency=_build_concurrency(raw),
         pricing=_build_pricing(raw),
+        lab03=_build_lab03(raw),
+        lab05=_build_lab05(raw),
+        lab09=_build_lab09(raw),
     )

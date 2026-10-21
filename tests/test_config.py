@@ -31,6 +31,16 @@ input_per_1m_usd = 0.05
 output_per_1m_usd = 0.08
 cached_input_per_1m_usd = 0.025
 price_verified_date = "2026-10-21"
+
+[lab03]
+caching_capable_models = ["openai/gpt-oss-20b", "openai/gpt-oss-120b"]
+
+[lab05]
+small_model = "llama-3.1-8b-instant"
+large_model = "llama-3.3-70b-versatile"
+
+[lab09]
+batch_completion_window = "24h"
 """
 
 
