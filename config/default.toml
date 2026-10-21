@@ -8,7 +8,14 @@
 [groq]
 # Model used when a lab doesn't override it. Individual labs will choose
 # specific models per experiment; this is only a fallback default.
-default_model = "llama-3.1-8b-instant"
+# NOTE (2026-10-21 live verification): llama-3.1-8b-instant and
+# llama-3.3-70b-versatile have been removed from Groq's hosted model list
+# (confirmed via a real `client.models.list()` call against a live API key).
+# Only openai/gpt-oss-* (20b/120b/safeguard-20b), qwen/qwen3.8-27b, and
+# allam-2-7b remain as chat-capable models. Switched the default + lab05
+# pair to the gpt-oss family, which also keeps prompt-caching (Lab03) demos
+# consistent with the routing demo (Lab05).
+default_model = "openai/gpt-oss-20b"
 request_timeout_seconds = 30.0
 
 [execution]
@@ -68,8 +75,10 @@ price_verified_date = "2026-10-21"
 
 [lab05]
 # Small/fast vs large/capable model pair used by the model-routing experiments.
-small_model = "llama-3.1-8b-instant"
-large_model = "llama-3.3-70b-versatile"
+# (see the NOTE under [groq] above -- llama-3.1-8b-instant/llama-3.3-70b-versatile
+# are no longer available; 20b vs 120b parameter count stands in for small/large.)
+small_model = "openai/gpt-oss-20b"
+large_model = "openai/gpt-oss-120b"
 
 [lab03]
 # Prompt caching is only supported on these Groq models today (Oct 2026).
