@@ -1,0 +1,40 @@
+# Default configuration for the Token Economics, Cost & API Performance labs.
+#
+# Safe-by-default: no real Groq API call can fire unless BOTH
+#   execution.live_api_enabled = true   (here, or overridden in a local config)
+#   AND the CLI is invoked with --live
+# are true. This prevents accidental API costs.
+
+[groq]
+# Model used when a lab doesn't override it. Individual labs will choose
+# specific models per experiment; this is only a fallback default.
+default_model = "llama-3.1-8b-instant"
+request_timeout_seconds = 30.0
+
+[execution]
+live_api_enabled = false
+# Printed to the participant before the first live call of a run.
+cost_warning_message = "This run will send real requests to the Groq API and may incur real cost on your account."
+
+[experiment]
+default_repetitions = 5
+results_dir = "results"
+
+[retry]
+max_attempts = 5
+base_delay_seconds = 1.0
+max_delay_seconds = 30.0
+jitter = true
+
+[concurrency]
+max_concurrent_requests = 5
+
+# Pricing is USD per 1,000,000 tokens. These are PLACEHOLDERS.
+# They MUST be verified against the live Groq pricing page
+# (https://groq.com/pricing) immediately before any lab that relies on
+# cost calculation (Lab01, Lab04, Lab09) is implemented or run live.
+[pricing.models."llama-3.1-8b-instant"]
+input_per_1m_usd = 0.0   # VERIFY-BEFORE-LIVE-RUN
+output_per_1m_usd = 0.0  # VERIFY-BEFORE-LIVE-RUN
+cached_input_per_1m_usd = 0.0 # VERIFY-BEFORE-LIVE-RUN - not all models support caching
+price_verified_date = "" # fill in (YYYY-MM-DD) when numbers below are confirmed

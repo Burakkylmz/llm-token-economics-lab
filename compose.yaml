@@ -1,0 +1,7 @@
+services:
+  lab-runner:
+    build: .
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+    volumes:
+      - ./results:/app/results
