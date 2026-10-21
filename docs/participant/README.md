@@ -6,8 +6,33 @@
    you prefer running without Docker.
 2. Copy `.env.example` to `.env` and set your own `GROQ_API_KEY`. Never
    share this key or commit it to version control.
-3. Build and run: see **Running with Docker** or **Running without Docker**
-   below.
+3. **Create your own live config.** `config/default.toml` ships with
+   `execution.live_api_enabled = false` on purpose (see **Safety**, below),
+   and it is never meant to be edited in place. Create your own copy instead:
+   ```
+   cp config/default.toml config/live.toml
+   ```
+   Then open `config/live.toml` and change `live_api_enabled = false` to
+   `live_api_enabled = true` under `[execution]`. This file is already in
+   `.gitignore` -- it is yours alone, never committed/pushed, and every
+   participant (and the repo itself) creates it independently after
+   cloning. **If you skip this step, every `--live` command below will
+   fail** with:
+   ```
+   lab_core.lab_cli_support.LiveExecutionNotAllowed: Live execution requested
+   (--live) but execution.live_api_enabled is false in configuration.
+   ```
+   This is not a bug -- it is the exact safety check working as designed.
+   The fix is always the same: create `config/live.toml` as above, and add
+   `--config config/live.toml` to the command.
+4. If you're on the Docker path, rebuild the image once after creating
+   `config/live.toml` so it's copied into the container:
+   ```
+   docker compose build
+   ```
+5. Build and run: see **Running with Docker** or **Running without Docker**
+   below. Every `--live` example from here on assumes `config/live.toml`
+   exists; the commands include `--config config/live.toml` explicitly.
 
 ## Running with Docker (recommended)
 
@@ -34,12 +59,12 @@ cat results/lab07_rate_limiting.json
 ```
 
 For any other lab, which does call the real Groq API, pass `--live` and
-make sure `GROQ_API_KEY` is set in your shell (Compose reads it from the
-environment via `environment: - GROQ_API_KEY=${GROQ_API_KEY}` in
-`compose.yaml`):
+`--config config/live.toml` (see Setup, step 3), and make sure
+`GROQ_API_KEY` is set in your shell (Compose reads it from the environment
+via `environment: - GROQ_API_KEY=${GROQ_API_KEY}` in `compose.yaml`):
 
 ```
-docker compose run --rm lab-runner lab01 short_prompt --live
+docker compose run --rm lab-runner lab01 short_prompt --live --config config/live.toml
 ```
 
 ### Validating the Docker setup itself (optional, for troubleshooting)
@@ -69,7 +94,8 @@ uv sync --group dev && uv run pytest -q   # optional: run the offline test suite
 Every lab (except Lab07, which is fully simulated and never calls the real
 API) requires **both**:
 
-1. `execution.live_api_enabled = true` in your config (`config/default.toml`
+1. `execution.live_api_enabled = true` in the config file you pass (your own
+   `config/live.toml` from Setup step 3 -- `config/default.toml` always
    defaults this to `false`), **and**
 2. the `--live` flag on the command line.
 
@@ -78,11 +104,24 @@ request or incurring any cost. This is deliberate -- running a lab with
 `--live` sends real requests to the Groq API using your own key and may
 incur real, if typically very small, cost on your account.
 
-General pattern: `uv run lab-cli <lab_id> <experiment> --live [options]`,
-or the Docker equivalent: `docker compose run --rm lab-runner <lab_id> <experiment> --live [options]`.
+General pattern: `uv run lab-cli <lab_id> <experiment> --live --config config/live.toml [options]`,
+or the Docker equivalent: `docker compose run --rm lab-runner <lab_id> <experiment> --live --config config/live.toml [options]`.
 Every example below uses the `uv run lab-cli ...` form; substitute
 `docker compose run --rm lab-runner ...` if you're on the Docker path.
 Results are written as both JSON and CSV under `results/`.
+
+**Model availability can change.** Groq's hosted model list is not fixed --
+during this project's own live verification, two models it originally
+shipped with (`llama-3.1-8b-instant`, `llama-3.3-70b-versatile`) had already
+been removed from the account, producing `groq.NotFoundError: ...
+model_not_found`. If you hit this, check which models your key can actually
+use and update `[groq] default_model` (and `[lab05]`'s model pair) in your
+`config/live.toml` accordingly:
+```
+uv run python -c "from groq import Groq; [print(m.id) for m in Groq().models.list().data]"
+# or, via Docker:
+docker compose run --rm --entrypoint uv lab-runner run python -c "from groq import Groq; [print(m.id) for m in Groq().models.list().data]"
+```
 
 ## Lab01 -- Token Anatomy & Cost Calculation
 
@@ -90,7 +129,7 @@ Results are written as both JSON and CSV under `results/`.
 request, and how estimated cost is computed from it.
 
 ```
-uv run lab-cli lab01 all --live
+uv run lab-cli lab01 all --live --config config/live.toml
 ```
 
 Compare `short_prompt` vs `long_prompt`: prompt_tokens should scale with
@@ -105,7 +144,7 @@ question changes prompt_tokens, cost, and latency -- while the question
 and its correct answer stay the same.
 
 ```
-uv run lab-cli lab02 all --live --turns 5
+uv run lab-cli lab02 all --live --config config/live.toml --turns 5
 ```
 
 Compare `minimal_context`, `expanded_context`, and `irrelevant_context`:
@@ -121,7 +160,7 @@ turn over turn as conversation history accumulates.
 only) in action.
 
 ```
-uv run lab-cli lab03 all --live
+uv run lab-cli lab03 all --live --config config/live.toml
 ```
 
 Compare `repeated_prefix` (identical long system prompt every call) vs
@@ -136,7 +175,7 @@ caching is provider-managed, has a 2-hour TTL, and is never guaranteed.
 batching several questions into one call compares to one call per question.
 
 ```
-uv run lab-cli lab04 all --live
+uv run lab-cli lab04 all --live --config config/live.toml
 ```
 
 For `output_limit_sweep`, completion_tokens should track the `max_tokens`
@@ -154,7 +193,7 @@ longer/keyword-flagged prompts to a large model, over a small golden
 dataset with deterministic pass/fail checks.
 
 ```
-uv run lab-cli lab05 all --live
+uv run lab-cli lab05 all --live --config config/live.toml
 ```
 
 Compare the two `summary` lines printed (accuracy / cost / latency).
@@ -169,7 +208,7 @@ time-to-first-*visible*-content, and compare streaming vs non-streaming
 total latency and throughput.
 
 ```
-uv run lab-cli lab06 all --live
+uv run lab-cli lab06 all --live --config config/live.toml
 ```
 
 `ttft_ms` marks the first network chunk; `first_visible_content_ms` marks
@@ -200,7 +239,7 @@ Compare `total_wait_seconds` and `retry_count` across strategies.
 prompts.
 
 ```
-uv run lab-cli lab08 all --live --max-concurrent 4
+uv run lab-cli lab08 all --live --config config/live.toml --max-concurrent 4
 ```
 
 Compare total wall-clock time, `requests_per_second`, and p50/p95 latency
@@ -214,13 +253,19 @@ Python-level async/concurrent requests, and the provider-managed Groq
 Batch API.
 
 ```
-uv run lab-cli lab09 sequential --live
-uv run lab-cli lab09 async --live
-uv run lab-cli lab09 prepare_batch_input          # no --live needed, pure local file write
-uv run lab-cli lab09 submit_batch --live           # submits only; does NOT wait
-uv run lab-cli lab09 check_batch_status --live --batch-id <id>
-uv run lab-cli lab09 fetch_batch_results --live --output-file-id <id>
+uv run lab-cli lab09 sequential --live --config config/live.toml
+uv run lab-cli lab09 async --live --config config/live.toml
+uv run lab-cli lab09 prepare_batch_input --config config/live.toml   # no --live needed, pure local file write
+uv run lab-cli lab09 submit_batch --live --config config/live.toml   # submits only; does NOT wait
+uv run lab-cli lab09 check_batch_status --live --config config/live.toml --batch-id <id>
+uv run lab-cli lab09 fetch_batch_results --live --config config/live.toml --output-file-id <id>
 ```
+
+**Note:** on at least one real Groq account, `submit_batch` returned a real
+`403 Permission Denied: Not available for your plan` -- the Batch API is
+not enabled for every plan tier. If you hit this, it's an account
+limitation, not a bug in this lab; ask your instructor for a sample
+captured result to discuss instead.
 
 **A real batch job's completion window is 24 hours to 7 days** -- it will
 not finish during a class session. See
@@ -231,9 +276,15 @@ to discuss the Batch API's output shape and cost trade-off without waiting.
 
 - `GROQ_API_KEY is not set`: export it (`.env` via Docker Compose, or your
   shell environment when using `uv` directly).
-- `Live execution requested but execution.live_api_enabled is false`: edit
-  your config's `[execution]` section, or pass `--config <path>` to a copy
-  with it set to `true`.
+- `Live execution requested but execution.live_api_enabled is false`: you
+  haven't created `config/live.toml` yet (Setup, step 3), or forgot
+  `--config config/live.toml` on this specific command.
+- `model_not_found` (404): the model in your config no longer exists on
+  Groq's side -- see the "Model availability can change" note under
+  **Safety**, above.
+- `403 Permission Denied: Not available for your plan`: the API feature
+  you're calling (e.g. the Batch API in Lab09) isn't enabled for your
+  account's plan tier -- not a bug, a real access restriction.
 - Results look identical across repetitions: real models and networks are
   non-deterministic; run with more `--repetitions` before drawing conclusions
   from a single call.
