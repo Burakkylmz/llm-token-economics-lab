@@ -9,6 +9,7 @@ RUN uv sync --frozen --no-install-project
 
 COPY config ./config
 COPY src ./src
+COPY tests ./tests
 RUN uv sync --frozen
 
 ENTRYPOINT ["uv", "run", "lab-cli"]
