@@ -48,6 +48,48 @@ No real Groq API call is ever made without an explicit `--live` flag at
 the CLI, on top of `execution.live_api_enabled = true` in configuration
 (see `config/default.toml`). This is a deliberate safety default.
 
+## Running with Docker
+
+This is the recommended path for participants: no local Python/uv install
+needed, only Docker Engine/Desktop + Docker Compose.
+
+```
+# 1. Build the image (first time, or after pulling changes)
+docker compose build
+
+# 2. Smoke-test: should print the CLI help with all 9 labs listed
+docker compose run --rm lab-runner --help
+
+# 3. Run a lab. Lab07 is fully simulated, so it needs no API key or --live --
+#    good for a first end-to-end check that everything is wired correctly.
+docker compose run --rm lab-runner lab07 all
+
+# 4. Check the results landed on your host (via the results/ bind mount)
+cat results/lab07_rate_limiting.json
+```
+
+For any other lab, pass `--live` and make sure `.env` has a valid
+`GROQ_API_KEY` (Compose reads it via `environment: - GROQ_API_KEY=${GROQ_API_KEY}`
+in `compose.yaml`, so export it in your shell or use `--env-file .env`):
+
+```
+docker compose run --rm lab-runner lab01 short_prompt --live
+```
+
+### Validating the Docker setup itself
+
+To confirm the image builds cleanly and the full offline test suite passes
+*inside the container* (not just on the host), run:
+
+```
+docker compose build
+docker compose run --rm --entrypoint uv lab-runner run pytest -q
+```
+
+This should report all tests passing with no `GROQ_API_KEY` set and no
+network access -- the same offline guarantee as running `uv run pytest`
+directly on the host (see Development, below).
+
 ## Documentation
 
 - Participants: `docs/participant/README.md`

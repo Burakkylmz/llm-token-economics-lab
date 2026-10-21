@@ -2,11 +2,67 @@
 
 ## Setup
 
-1. Install Docker Engine/Desktop + Docker Compose, or `uv` if you prefer running without Docker.
-2. Copy `.env.example` to `.env` and set your own `GROQ_API_KEY`. Never share this key or commit it to version control.
-3. Build and run:
-   - Docker: `docker compose run --rm lab-runner --help`
-   - uv: `uv sync && uv run lab-cli --help`
+1. Install Docker Engine/Desktop + Docker Compose (recommended), or `uv` if
+   you prefer running without Docker.
+2. Copy `.env.example` to `.env` and set your own `GROQ_API_KEY`. Never
+   share this key or commit it to version control.
+3. Build and run: see **Running with Docker** or **Running without Docker**
+   below.
+
+## Running with Docker (recommended)
+
+You don't need Python or `uv` installed at all -- only Docker.
+
+```
+# 1. Build the image (first time, or after pulling repo changes)
+docker compose build
+
+# 2. Smoke-test: should print the CLI help with all 9 labs listed
+docker compose run --rm lab-runner --help
+```
+
+If step 2 prints the help text with `lab01` through `lab09` listed, the
+setup is working. Next, run a lab end to end without needing an API key
+yet, to confirm results actually come back out to your machine:
+
+```
+# Lab07 is fully simulated -- no API key, no --live, needed.
+docker compose run --rm lab-runner lab07 all
+
+# Check the results landed on your HOST machine (results/ is bind-mounted)
+cat results/lab07_rate_limiting.json
+```
+
+For any other lab, which does call the real Groq API, pass `--live` and
+make sure `GROQ_API_KEY` is set in your shell (Compose reads it from the
+environment via `environment: - GROQ_API_KEY=${GROQ_API_KEY}` in
+`compose.yaml`):
+
+```
+docker compose run --rm lab-runner lab01 short_prompt --live
+```
+
+### Validating the Docker setup itself (optional, for troubleshooting)
+
+To confirm the image builds cleanly and the full offline test suite (71
+tests, no API key or network needed) passes *inside the container*:
+
+```
+docker compose build
+docker compose run --rm --entrypoint uv lab-runner run pytest -q
+```
+
+If this doesn't end with `... passed`, something about your local Docker
+build is broken independently of any lab or API key -- fix this first
+before troubleshooting a specific lab.
+
+## Running without Docker (uv)
+
+```
+uv sync
+uv run lab-cli --help
+uv sync --group dev && uv run pytest -q   # optional: run the offline test suite
+```
 
 ## Safety: when does a lab actually call the Groq API?
 
@@ -22,7 +78,10 @@ request or incurring any cost. This is deliberate -- running a lab with
 `--live` sends real requests to the Groq API using your own key and may
 incur real, if typically very small, cost on your account.
 
-General pattern: `uv run lab-cli <lab_id> <experiment> --live [options]`.
+General pattern: `uv run lab-cli <lab_id> <experiment> --live [options]`,
+or the Docker equivalent: `docker compose run --rm lab-runner <lab_id> <experiment> --live [options]`.
+Every example below uses the `uv run lab-cli ...` form; substitute
+`docker compose run --rm lab-runner ...` if you're on the Docker path.
 Results are written as both JSON and CSV under `results/`.
 
 ## Lab01 -- Token Anatomy & Cost Calculation
@@ -178,3 +237,14 @@ to discuss the Batch API's output shape and cost trade-off without waiting.
 - Results look identical across repetitions: real models and networks are
   non-deterministic; run with more `--repetitions` before drawing conclusions
   from a single call.
+- `docker: error during connect` / `Cannot connect to the Docker daemon`:
+  Docker Desktop (or the Docker Engine service) isn't running -- start it
+  and wait for it to report "running" before retrying.
+- Docker build fails on `uv sync` with a missing file error: make sure
+  you're building from the repository root (`docker compose build` run
+  from the directory containing `compose.yaml`), not a subdirectory.
+- Not sure if the Docker setup itself (vs. a specific lab or API key) is
+  the problem? Run the in-container test suite first:
+  `docker compose run --rm --entrypoint uv lab-runner run pytest -q` --
+  if that passes, the image and CLI wiring are fine and the issue is
+  specific to the lab/API key you were testing.
