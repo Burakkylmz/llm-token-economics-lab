@@ -8,6 +8,7 @@ from lab_core.lab_cli_support import add_common_arguments, build_context
 from lab_core.metrics import ExperimentResult
 from lab_core.results_writer import append_csv, write_json
 from labs.lab01_token_anatomy.experiments import EXPERIMENTS, run_experiment
+from labs.lab01_token_anatomy.factorial_cli import add_factorial_arguments, run_factorial
 from labs.lab01_token_anatomy.observability import summarize_values, tally_finish_reasons
 
 LAB_ID = "lab01"
@@ -104,6 +105,10 @@ def _print_and_build_summary(experiment: str, model: str, results: list[Experime
 
 
 def _run(args: argparse.Namespace) -> None:
+    if args.experiment == "factorial":
+        run_factorial(args)
+        return
+
     ctx = build_context(requested_live=args.live, config_path=args.config)
     if not ctx.live:
         print(
@@ -140,7 +145,13 @@ def _run(args: argparse.Namespace) -> None:
 
 def register(subparsers: "argparse._SubParsersAction") -> None:
     parser = subparsers.add_parser(LAB_ID, help="Lab01 - Token Anatomy & Cost Calculation")
-    parser.add_argument("experiment", choices=[*EXPERIMENTS.keys(), "all"])
+    parser.add_argument(
+        "experiment",
+        choices=[*EXPERIMENTS.keys(), "all", "factorial"],
+        help="short_prompt/long_prompt/all run Lab01's basic mode; factorial runs the "
+        "full-factorial reasoning_effort x temperature x top_p experiment engine.",
+    )
     parser.add_argument("--model", default=None, help="Groq model id (default: config groq.default_model).")
     add_common_arguments(parser)
+    add_factorial_arguments(parser)
     parser.set_defaults(func=_run)

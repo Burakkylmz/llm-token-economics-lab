@@ -148,6 +148,32 @@ reasoning tokens, when available) and is also written to
 treat that summary as descriptive of one run, not a statistically robust
 benchmark.
 
+### Lab01 factorial mode -- reasoning_effort x temperature x top_p
+
+A separate execution mode studies how `reasoning_effort`, `temperature`,
+and `top_p` affect reasoning/completion token consumption, latency, and
+cost, across a full factorial matrix (54 conditions at the default
+settings, repeated 10x each = 540 planned API calls). It never touches
+`lab01_token_anatomy.{json,csv}`; results go to their own
+`results/lab01_factorial/<experiment_run_id>/` folder.
+
+```
+# Preview the plan -- never calls the API, needs no API key:
+uv run lab-cli lab01 factorial --dry-run --config config/default.toml
+
+# Restrict to a smaller, cheaper slice:
+uv run lab-cli lab01 factorial --dry-run --prompt short_prompt --reasoning-effort low --config config/default.toml
+
+# Real execution (real cost -- see config/default.toml's [lab01.factorial]
+# section for the request/cost budget caps that apply):
+uv run lab-cli lab01 factorial --live --config config/live.toml
+```
+
+See `docs/instructor/README.md`'s "LAB01 -- Full Factorial Inference
+Experimentation" section for the full experimental design, statistics
+methodology, and troubleshooting guide (ask your instructor if you don't
+have access to that file).
+
 ## Lab02 -- Context Growth & Context Bloat
 
 **Objective:** observe how growing or padding the context before a

@@ -92,3 +92,131 @@ def test_negative_pricing_rejected(tmp_path):
     broken = VALID_TOML.replace("input_per_1m_usd = 0.05", "input_per_1m_usd = -1.0")
     with pytest.raises(ConfigError):
         load_config(_write(tmp_path, broken))
+
+
+# --- lab01.factorial: optional section, backward compatibility ------------
+
+
+def test_lab01_factorial_section_absent_is_none(tmp_path):
+    # A config file written before this feature existed (no [lab01.factorial]
+    # at all) must keep loading and running Lab01 basic mode unchanged.
+    config = load_config(_write(tmp_path, VALID_TOML))
+    assert config.lab01_factorial is None
+
+
+FACTORIAL_TOML = (
+    VALID_TOML
+    + """
+[lab01.factorial]
+enabled = true
+prompts = ["short_prompt", "long_prompt"]
+reasoning_efforts = ["low", "medium", "high"]
+temperatures = [0.5, 1.0, 1.5]
+top_p_values = [0.7, 0.9, 1.0]
+repetitions = 10
+max_completion_tokens = 4096
+randomize_execution_order = true
+randomization_seed = 42
+"""
+)
+
+
+def test_lab01_factorial_section_present_and_valid(tmp_path):
+    config = load_config(_write(tmp_path, FACTORIAL_TOML))
+    f = config.lab01_factorial
+    assert f is not None
+    assert f.enabled is True
+    assert f.prompts == ("short_prompt", "long_prompt")
+    assert f.reasoning_efforts == ("low", "medium", "high")
+    assert f.temperatures == (0.5, 1.0, 1.5)
+    assert f.top_p_values == (0.7, 0.9, 1.0)
+    assert f.repetitions == 10
+    assert f.max_completion_tokens == 4096
+    assert f.use_paired_api_seed is False
+    assert f.max_api_calls is None
+    assert f.max_estimated_cost_usd is None
+
+
+def test_lab01_factorial_optional_budget_fields(tmp_path):
+    toml = FACTORIAL_TOML + "\nmax_api_calls = 100\nmax_estimated_cost_usd = 0.5\n"
+    config = load_config(_write(tmp_path, toml))
+    assert config.lab01_factorial.max_api_calls == 100
+    assert config.lab01_factorial.max_estimated_cost_usd == 0.5
+
+
+def test_lab01_factorial_empty_prompts_rejected(tmp_path):
+    broken = FACTORIAL_TOML.replace('prompts = ["short_prompt", "long_prompt"]', "prompts = []")
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab01_factorial_invalid_temperature_rejected(tmp_path):
+    broken = FACTORIAL_TOML.replace("temperatures = [0.5, 1.0, 1.5]", "temperatures = [0.5, 1.0, 2.5]")
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab01_factorial_invalid_top_p_rejected(tmp_path):
+    broken = FACTORIAL_TOML.replace("top_p_values = [0.7, 0.9, 1.0]", "top_p_values = [0.7, 0.9, 1.1]")
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab01_factorial_top_p_zero_rejected(tmp_path):
+    # top_p is a nucleus-sampling probability mass; 0 is out of range (exclusive lower bound).
+    broken = FACTORIAL_TOML.replace("top_p_values = [0.7, 0.9, 1.0]", "top_p_values = [0.0, 0.9, 1.0]")
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab01_factorial_unsupported_reasoning_effort_rejected(tmp_path):
+    broken = FACTORIAL_TOML.replace(
+        'reasoning_efforts = ["low", "medium", "high"]', 'reasoning_efforts = ["low", "none"]'
+    )
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab01_factorial_duplicate_levels_rejected(tmp_path):
+    broken = FACTORIAL_TOML.replace("temperatures = [0.5, 1.0, 1.5]", "temperatures = [0.5, 0.5, 1.5]")
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab01_factorial_near_duplicate_floats_rejected(tmp_path):
+    # Distinct floats that would format identically at the precision used for
+    # condition_id must be rejected here, before they could ever produce a
+    # silent condition_id collision downstream.
+    broken = FACTORIAL_TOML.replace("temperatures = [0.5, 1.0, 1.5]", "temperatures = [0.5, 0.5000001, 1.5]")
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab01_factorial_non_positive_repetitions_rejected(tmp_path):
+    broken = FACTORIAL_TOML.replace("repetitions = 10", "repetitions = 0")
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab01_factorial_non_positive_max_completion_tokens_rejected(tmp_path):
+    broken = FACTORIAL_TOML.replace("max_completion_tokens = 4096", "max_completion_tokens = 0")
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab01_factorial_unknown_key_rejected(tmp_path):
+    broken = FACTORIAL_TOML + "\nthis_is_not_a_real_key = 1\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab01_factorial_negative_max_api_calls_rejected(tmp_path):
+    broken = FACTORIAL_TOML + "\nmax_api_calls = -5\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab01_factorial_negative_max_estimated_cost_rejected(tmp_path):
+    broken = FACTORIAL_TOML + "\nmax_estimated_cost_usd = -1.0\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
