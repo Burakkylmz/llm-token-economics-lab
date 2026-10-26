@@ -148,31 +148,36 @@ reasoning tokens, when available) and is also written to
 treat that summary as descriptive of one run, not a statistically robust
 benchmark.
 
-### Lab01 factorial mode -- reasoning_effort x temperature x top_p
+### Lab01 effort mode -- reasoning_effort comparison
 
-A separate execution mode studies how `reasoning_effort`, `temperature`,
-and `top_p` affect reasoning/completion token consumption, latency, and
-cost, across a full factorial matrix (54 conditions at the default
-settings, repeated 10x each = 540 planned API calls). It never touches
-`lab01_token_anatomy.{json,csv}`; results go to their own
-`results/lab01_factorial/<experiment_run_id>/` folder.
+A separate execution mode compares `reasoning_effort` levels only
+(low/medium/high) for a fixed prompt, to study their effect on
+reasoning/completion token consumption, latency, and cost. (An earlier,
+much larger `factorial` mode that also varied `temperature`/`top_p` across
+540 calls was retired due to Groq rate-limit/quota pressure; `lab01
+factorial` now always fails closed with a message pointing here.) It never
+touches `lab01_token_anatomy.{json,csv}`; results go to their own
+`results/lab01_effort/<experiment_run_id>/` folder.
 
 ```
-# Preview the plan -- never calls the API, needs no API key:
-uv run lab-cli lab01 factorial --dry-run --config config/default.toml
+# Preview the plan (6 calls by default) -- never calls the API, needs no API key:
+uv run lab-cli lab01 effort --dry-run --config config/default.toml
 
-# Restrict to a smaller, cheaper slice:
-uv run lab-cli lab01 factorial --dry-run --prompt short_prompt --reasoning-effort low --config config/default.toml
+# Minimal pilot (3 calls: 1 repetition instead of 2):
+uv run lab-cli lab01 effort --dry-run --repetitions 1 --config config/default.toml
 
-# Real execution (real cost -- see config/default.toml's [lab01.factorial]
+# Extended experiment (12 calls: adds long_prompt):
+uv run lab-cli lab01 effort --dry-run --prompt short_prompt long_prompt --config config/default.toml
+
+# Real execution (real cost -- see config/default.toml's [lab01.effort]
 # section for the request/cost budget caps that apply):
-uv run lab-cli lab01 factorial --live --config config/live.toml
+uv run lab-cli lab01 effort --live --config config/live.toml
 ```
 
-See `docs/instructor/README.md`'s "LAB01 -- Full Factorial Inference
-Experimentation" section for the full experimental design, statistics
-methodology, and troubleshooting guide (ask your instructor if you don't
-have access to that file).
+See `docs/instructor/README.md`'s "LAB01 -- Reasoning Effort Comparison"
+section for the full experimental design, statistics methodology, and
+troubleshooting guide (ask your instructor if you don't have access to
+that file).
 
 ## Lab02 -- Context Growth & Context Bloat
 

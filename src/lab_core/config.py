@@ -110,6 +110,30 @@ class Lab01FactorialConfig:
 
 
 @dataclass(frozen=True)
+class Lab01EffortConfig:
+    """Lab01's `effort` execution mode: compares reasoning_effort levels only.
+
+    Replaces [lab01.factorial] (temperature/top_p/reasoning_effort full
+    factorial, retired for Groq rate-limit/quota reasons -- see
+    labs.lab01_token_anatomy.cli._run_legacy_factorial_stub) as the active
+    multi-call Lab01 experiment. Like Lab01FactorialConfig, this whole
+    section is optional at the AppConfig level: a config file that omits
+    [lab01.effort] still runs Lab01's basic mode unchanged.
+    """
+
+    enabled: bool
+    prompts: tuple[str, ...]
+    reasoning_efforts: tuple[str, ...]
+    repetitions: int
+    max_completion_tokens: int
+    randomize_execution_order: bool
+    randomization_seed: int
+    use_paired_api_seed: bool
+    max_api_calls: Optional[int] = None
+    max_estimated_cost_usd: Optional[float] = None
+
+
+@dataclass(frozen=True)
 class AppConfig:
     groq: GroqConfig
     execution: ExecutionConfig
@@ -121,6 +145,7 @@ class AppConfig:
     lab05: Lab05Config
     lab09: Lab09Config
     lab01_factorial: Optional[Lab01FactorialConfig]
+    lab01_effort: Optional[Lab01EffortConfig]
 
 
 def _require(section: dict, key: str, section_name: str) -> object:
@@ -385,6 +410,102 @@ def _build_lab01_factorial(raw: dict) -> Optional[Lab01FactorialConfig]:
     )
 
 
+def _build_lab01_effort(raw: dict) -> Optional[Lab01EffortConfig]:
+    """Same optional-section, same validation style as _build_lab01_factorial
+    above, just without temperature/top_p -- see Lab01EffortConfig."""
+    lab01_section = raw.get("lab01", {})
+    if "effort" not in lab01_section:
+        return None
+
+    section = lab01_section["effort"]
+
+    enabled = section.get("enabled", True)
+    if not isinstance(enabled, bool):
+        raise ConfigError("lab01.effort.enabled must be a boolean")
+
+    prompts = _validate_nonempty_string_list(
+        _require(section, "prompts", "lab01.effort"), "lab01.effort.prompts"
+    )
+    reasoning_efforts = _validate_nonempty_string_list(
+        _require(section, "reasoning_efforts", "lab01.effort"), "lab01.effort.reasoning_efforts"
+    )
+    for effort in reasoning_efforts:
+        if effort not in SUPPORTED_REASONING_EFFORTS:
+            raise ConfigError(
+                f"lab01.effort.reasoning_efforts: unsupported value '{effort}' -- "
+                f"this project's models only support {SUPPORTED_REASONING_EFFORTS} "
+                "(see the SUPPORTED_REASONING_EFFORTS comment in this module)"
+            )
+
+    repetitions = _require(section, "repetitions", "lab01.effort")
+    if isinstance(repetitions, bool) or not isinstance(repetitions, int) or repetitions < 1:
+        raise ConfigError("lab01.effort.repetitions must be a positive integer")
+
+    max_completion_tokens = _require(section, "max_completion_tokens", "lab01.effort")
+    if (
+        isinstance(max_completion_tokens, bool)
+        or not isinstance(max_completion_tokens, int)
+        or max_completion_tokens < 1
+    ):
+        raise ConfigError("lab01.effort.max_completion_tokens must be a positive integer")
+
+    randomize_execution_order = _require(section, "randomize_execution_order", "lab01.effort")
+    if not isinstance(randomize_execution_order, bool):
+        raise ConfigError("lab01.effort.randomize_execution_order must be a boolean")
+
+    randomization_seed = _require(section, "randomization_seed", "lab01.effort")
+    if isinstance(randomization_seed, bool) or not isinstance(randomization_seed, int):
+        raise ConfigError("lab01.effort.randomization_seed must be an integer")
+
+    use_paired_api_seed = section.get("use_paired_api_seed", False)
+    if not isinstance(use_paired_api_seed, bool):
+        raise ConfigError("lab01.effort.use_paired_api_seed must be a boolean")
+
+    max_api_calls = section.get("max_api_calls")
+    if max_api_calls is not None:
+        if isinstance(max_api_calls, bool) or not isinstance(max_api_calls, int) or max_api_calls < 1:
+            raise ConfigError("lab01.effort.max_api_calls must be a positive integer or omitted")
+
+    max_estimated_cost_usd = section.get("max_estimated_cost_usd")
+    if max_estimated_cost_usd is not None:
+        if (
+            isinstance(max_estimated_cost_usd, bool)
+            or not isinstance(max_estimated_cost_usd, (int, float))
+            or max_estimated_cost_usd <= 0
+        ):
+            raise ConfigError("lab01.effort.max_estimated_cost_usd must be a positive number or omitted")
+        max_estimated_cost_usd = float(max_estimated_cost_usd)
+
+    known_keys = {
+        "enabled",
+        "prompts",
+        "reasoning_efforts",
+        "repetitions",
+        "max_completion_tokens",
+        "randomize_execution_order",
+        "randomization_seed",
+        "use_paired_api_seed",
+        "max_api_calls",
+        "max_estimated_cost_usd",
+    }
+    unknown_keys = set(section.keys()) - known_keys
+    if unknown_keys:
+        raise ConfigError(f"lab01.effort has unknown configuration key(s): {sorted(unknown_keys)}")
+
+    return Lab01EffortConfig(
+        enabled=enabled,
+        prompts=tuple(prompts),
+        reasoning_efforts=tuple(reasoning_efforts),
+        repetitions=repetitions,
+        max_completion_tokens=max_completion_tokens,
+        randomize_execution_order=randomize_execution_order,
+        randomization_seed=randomization_seed,
+        use_paired_api_seed=use_paired_api_seed,
+        max_api_calls=max_api_calls,
+        max_estimated_cost_usd=max_estimated_cost_usd,
+    )
+
+
 def load_config(path: Path | None = None) -> AppConfig:
     """Load and validate the TOML configuration at `path` (default: config/default.toml)."""
     config_path = path if path is not None else DEFAULT_CONFIG_PATH
@@ -402,4 +523,5 @@ def load_config(path: Path | None = None) -> AppConfig:
         lab05=_build_lab05(raw),
         lab09=_build_lab09(raw),
         lab01_factorial=_build_lab01_factorial(raw),
+        lab01_effort=_build_lab01_effort(raw),
     )

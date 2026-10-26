@@ -7,8 +7,8 @@ from dataclasses import asdict
 from lab_core.lab_cli_support import add_common_arguments, build_context
 from lab_core.metrics import ExperimentResult
 from lab_core.results_writer import append_csv, write_json
+from labs.lab01_token_anatomy.effort_cli import add_effort_arguments, run_effort
 from labs.lab01_token_anatomy.experiments import EXPERIMENTS, run_experiment
-from labs.lab01_token_anatomy.factorial_cli import add_factorial_arguments, run_factorial
 from labs.lab01_token_anatomy.observability import summarize_values, tally_finish_reasons
 
 LAB_ID = "lab01"
@@ -104,9 +104,33 @@ def _print_and_build_summary(experiment: str, model: str, results: list[Experime
     }
 
 
+def _run_legacy_factorial_stub(args: argparse.Namespace) -> None:
+    """The temperature x top_p x reasoning_effort full-factorial engine
+    (540 calls by default) was retired: it created real Groq rate-limit/
+    quota pressure. `factorial` is kept as a recognized command -- so old
+    scripts/automations get a clear message instead of a parser error --
+    but it now ALWAYS fails closed, regardless of any flags passed. It
+    never builds a plan, never constructs a Groq client, and never makes
+    an API request. Use `lab01 effort` instead.
+    """
+    print(
+        "LAB01's `factorial` execution mode (the temperature x top_p x "
+        "reasoning_effort full-factorial experiment, 540 calls by default) "
+        "has been retired to avoid Groq rate-limit/quota pressure.\n\n"
+        "Use `lab01 effort` instead -- a focused reasoning_effort-only "
+        "comparison (6 calls by default; 12 for the extended short+long "
+        "prompt experiment). See config/default.toml's [lab01.effort] "
+        "section.\n\n"
+        "No API requests were made."
+    )
+
+
 def _run(args: argparse.Namespace) -> None:
     if args.experiment == "factorial":
-        run_factorial(args)
+        _run_legacy_factorial_stub(args)
+        return
+    if args.experiment == "effort":
+        run_effort(args)
         return
 
     ctx = build_context(requested_live=args.live, config_path=args.config)
@@ -147,11 +171,12 @@ def register(subparsers: "argparse._SubParsersAction") -> None:
     parser = subparsers.add_parser(LAB_ID, help="Lab01 - Token Anatomy & Cost Calculation")
     parser.add_argument(
         "experiment",
-        choices=[*EXPERIMENTS.keys(), "all", "factorial"],
-        help="short_prompt/long_prompt/all run Lab01's basic mode; factorial runs the "
-        "full-factorial reasoning_effort x temperature x top_p experiment engine.",
+        choices=[*EXPERIMENTS.keys(), "all", "effort", "factorial"],
+        help="short_prompt/long_prompt/all run Lab01's basic mode; effort runs the "
+        "reasoning_effort-only comparison experiment; factorial is retired and always "
+        "fails closed (see `lab01 effort`).",
     )
     parser.add_argument("--model", default=None, help="Groq model id (default: config groq.default_model).")
     add_common_arguments(parser)
-    add_factorial_arguments(parser)
+    add_effort_arguments(parser)
     parser.set_defaults(func=_run)

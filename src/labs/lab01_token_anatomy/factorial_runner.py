@@ -13,7 +13,7 @@ Reuses, rather than reimplements:
   - lab_core.retry.compute_backoff_delay_seconds for backoff math (the
     *policy* below -- which exceptions are retryable, how many attempts --
     is this module's own operational-resilience concern, not Lab07's
-    retry-strategy *experiment*; see this module's _call_with_retry
+    retry-strategy *experiment*; see this module's call_with_operational_retry
     docstring).
 """
 
@@ -118,7 +118,7 @@ class Budget:
         # are what actually bound worst-case exposure regardless.
 
 
-def _call_with_retry(
+def call_with_operational_retry(
     client: Groq,
     retry_config: RetryConfig,
     sleep_fn: Callable[[float], None] = time.sleep,
@@ -227,7 +227,7 @@ def execute_planned_call(
     if planned_call.api_seed is not None:
         create_kwargs["seed"] = planned_call.api_seed
 
-    call_result, attempts_used, error = _call_with_retry(client, retry_config, **create_kwargs)
+    call_result, attempts_used, error = call_with_operational_retry(client, retry_config, **create_kwargs)
 
     timestamp = datetime.now(timezone.utc).isoformat()
     base = dict(

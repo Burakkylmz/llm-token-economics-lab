@@ -87,16 +87,34 @@ caching_capable_models = ["openai/gpt-oss-20b", "openai/gpt-oss-120b"]
 [lab09]
 batch_completion_window = "24h"
 
-[lab01.factorial]
-# Lab01's "factorial" execution mode: a full-factorial sweep over
-# reasoning_effort x temperature x top_p for each prompt type, to study
-# how those generation parameters affect reasoning/completion token
-# consumption, latency, and cost. Entirely optional: a config file that
-# omits this whole [lab01.factorial] section still runs Lab01's basic
-# mode unchanged (see lab_core.config._build_lab01_factorial).
+# [lab01.factorial] (the temperature x top_p x reasoning_effort full
+# factorial engine, 540 calls by default) has been RETIRED -- it created
+# real Groq rate-limit/quota pressure. The `lab01 factorial` CLI command
+# still exists but now always fails closed (see
+# labs.lab01_token_anatomy.cli._run_legacy_factorial_stub); it never reads
+# a [lab01.factorial] section, so one lingering in your own config/live.toml
+# from before this change is harmless, inert leftover -- safe to remove,
+# but not required to. Use [lab01.effort] below instead.
+
+[lab01.effort]
+# Lab01's "effort" execution mode: compares reasoning_effort levels only
+# (low/medium/high) for a fixed prompt. Entirely optional: a config file
+# that omits this whole [lab01.effort] section still runs Lab01's basic
+# mode unchanged (see lab_core.config._build_lab01_effort).
+#
+# temperature/top_p are deliberately NOT configuration fields here at all
+# (not "0" or "unset" -- just absent): this experiment never sends them to
+# the API, so the provider's own defaults apply. That does not mean they
+# have zero effect on the model's output -- only that this experiment does
+# not vary or observe them. See docs/instructor/README.md for the (short)
+# theoretical note on what they do.
 enabled = true
 
-prompts = ["short_prompt", "long_prompt"]
+# Default scope: ONLY short_prompt, so the default experiment is exactly
+# 1 prompt x 3 efforts x 2 repetitions = 6 calls (see `repetitions` below).
+# Use `--prompt short_prompt long_prompt` on the command line to opt into
+# the extended 2 x 3 x 2 = 12-call experiment without editing this file.
+prompts = ["short_prompt"]
 
 # openai/gpt-oss-20b/120b (this project's models) only support these three
 # reasoning_effort levels -- verified against the installed groq SDK's own
@@ -104,60 +122,38 @@ prompts = ["short_prompt", "long_prompt"]
 # https://console.groq.com/docs/model/openai/gpt-oss-20b.
 reasoning_efforts = ["low", "medium", "high"]
 
-# Groq API: temperature must be in [0, 2].
-temperatures = [0.5, 1.0, 1.5]
+# 2 repetitions is this project's "Profile B -- Default Experiment": 1
+# prompt x 3 efforts x 2 repetitions = 6 calls. Override with
+# `--repetitions 1` for a 3-call minimal pilot (API/observability smoke
+# test only -- too few repetitions for any variability statistics).
+repetitions = 2
 
-# Groq API: top_p is a nucleus-sampling probability mass, must be in (0, 1].
-# NOTE: Groq's own docs recommend altering temperature OR top_p, "but not
-# both" -- this factorial design deliberately varies both anyway, because
-# studying that exact interaction is this experiment's point. Treat results
-# that vary both at once as an exploratory interaction study, not as a
-# recommended production sampling strategy.
-top_p_values = [0.7, 0.9, 1.0]
-
-repetitions = 10
-
-# 2 unique prompts x 3 efforts x 3 temperatures x 3 top_p values = 54
-# conditions x 10 repetitions = 540 total planned calls at these defaults.
-
-# openai/gpt-oss-20b's own documented limit (console.groq.com/docs/model/
-# openai/gpt-oss-20b) is 65536 max output tokens, but that is NOT used here
-# as the default: at 540 calls, a limit anywhere near that would make the
-# worst-case cost/runtime of one dry-run-approved execution unpredictable
-# and essentially unbounded. 4096 is chosen instead because this project's
-# own prior live-verified Lab01 runs (see docs/instructor/README.md) saw
-# long_prompt completions around 950-1200 tokens with no reasoning_effort
-# or max_completion_tokens set explicitly; 4096 leaves roughly 3-4x headroom
-# over that for the added reasoning-token budget at reasoning_effort="high"
-# while still bounding each call's worst case. finish_reason="length" is
-# recorded on every call specifically so truncation against this limit is
-# never silently invisible in the analysis.
+# Same default and rationale as the retired factorial engine: 3-4x headroom
+# over this project's prior live-verified long_prompt completions
+# (950-1200 tokens, see docs/instructor/README.md), well under
+# openai/gpt-oss-20b's documented 65536-token output ceiling.
+# finish_reason="length" is recorded on every call so truncation against
+# this limit is never silently invisible in the analysis.
 max_completion_tokens = 4096
 
-randomize_execution_order = true
+# At this much smaller scale (6-12 calls, vs. the retired engine's 540),
+# randomizing call order buys little bias-reduction and makes the terminal
+# output harder to follow grouped by condition -- off by default. Still
+# fully supported if you want it (e.g. for the extended 12-call mode).
+randomize_execution_order = false
 randomization_seed = 42
-
-# Optional: pair the same Groq API `seed` across all conditions sharing a
-# repetition_index (repetition 3 of every condition uses the same api_seed,
-# repetition 4 another, etc.) to make temperature/top_p/reasoning_effort
-# comparisons slightly less confounded by whatever that seed happens to
-# draw. Off by default: Groq's own docs say seed gives only a "best effort"
-# at determinism, never a guarantee, so this is a minor variance-reduction
-# aid, not a substitute for treating every result as one noisy observation.
 use_paired_api_seed = false
 
-# Request-count safety net: refuses to start a 541st call even if
-# --repetitions is overridden upward on the command line. Set to exactly
-# the full default matrix (54 x 10) -- raise it deliberately, never by
-# accident, if you intend to run more than the documented default.
-max_api_calls = 540
+# Request-count safety net. 12 = this project's "Profile C -- Extended
+# Experiment" (2 prompts x 3 efforts x 2 repetitions) -- the largest planned
+# scope documented for this mode. Raise it deliberately, never by accident,
+# if you intend more.
+max_api_calls = 12
 
 # Cost safety net, derived (not guessed) from this file's own [pricing] and
-# max_completion_tokens above: worst case is
-#   540 calls x 4096 max_completion_tokens x $0.30/1e6 (output) = $0.6636
-# plus a small, imprecise prompt-token share (see
-# labs.lab01_token_anatomy.factorial_runner's cost-estimation docstring for
-# why that part is an approximation, not a guarantee). $1.00 leaves clear
-# headroom above that completion-token ceiling while still being a real,
-# enforced cap rather than "unlimited".
-max_estimated_cost_usd = 1.00
+# max_completion_tokens above: worst case for the extended (12-call) scope
+# is 12 calls x 4096 max_completion_tokens x $0.30/1e6 (output) = $0.0147,
+# plus a negligible prompt-token share. $0.10 leaves generous headroom
+# above that completion-token ceiling while still being a real, enforced
+# cap rather than "unlimited".
+max_estimated_cost_usd = 0.10
