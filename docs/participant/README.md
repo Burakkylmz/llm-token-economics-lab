@@ -137,6 +137,17 @@ prompt length; completion_tokens depends on what the model chooses to say.
 Check `results/lab01_token_anatomy.csv` for the full breakdown and
 `estimated_cost_usd` per call.
 
+The terminal output also breaks down, per run, `reasoning_tokens` and the
+derived `non_reasoning_tokens` (= completion_tokens - reasoning_tokens, only
+when the provider reports reasoning_tokens) and `finish_reason` ("stop" vs
+"length" -- the latter means generation was cut off at a token limit, not a
+natural stop). After all repetitions of an experiment, a summary block
+reports min/max/mean/standard deviation for completion tokens (and
+reasoning tokens, when available) and is also written to
+`results/lab01_token_anatomy_summary.json`. With the default 5 repetitions,
+treat that summary as descriptive of one run, not a statistically robust
+benchmark.
+
 ## Lab02 -- Context Growth & Context Bloat
 
 **Objective:** observe how growing or padding the context before a

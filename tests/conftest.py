@@ -118,11 +118,11 @@ def make_usage():
 def make_response(make_usage):
     """Builds a fake non-streaming chat-completion response object."""
 
-    def _make(content: str = "hello", **usage_kwargs):
+    def _make(content: str = "hello", finish_reason: str | None = "stop", system_fingerprint: str | None = None, **usage_kwargs):
         usage = make_usage(**usage_kwargs)
         message = SimpleNamespace(content=content)
-        choice = SimpleNamespace(message=message, finish_reason="stop")
-        return SimpleNamespace(choices=[choice], usage=usage)
+        choice = SimpleNamespace(message=message, finish_reason=finish_reason)
+        return SimpleNamespace(choices=[choice], usage=usage, system_fingerprint=system_fingerprint)
 
     return _make
 
