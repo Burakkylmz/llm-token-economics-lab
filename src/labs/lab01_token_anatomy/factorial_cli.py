@@ -10,7 +10,7 @@ than inventing a second sub-subcommand layer.
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import datetime, timezone
 
 from lab_core.lab_cli_support import build_context
@@ -137,9 +137,20 @@ def run_factorial(args: argparse.Namespace) -> None:
     # --dry-run always wins over --live: a plan preview must never need an
     # API key or touch the network, no matter what else was passed.
     requested_live = bool(args.live) and not args.dry_run
-    ctx = build_context(requested_live=requested_live, config_path=args.config)
 
-    factorial_config = ctx.config.lab01_factorial
+    # Probe load: requested_live=False here ALWAYS, regardless of
+    # `requested_live` above -- this never prints the [COST WARNING] and
+    # never constructs a real Groq client, no matter what --live/--config
+    # say. It exists purely so configuration/matrix validation (missing
+    # [lab01.factorial], unsupported --prompt/--reasoning-effort values,
+    # an invalid matrix) can fail BEFORE the cost warning or client
+    # construction ever happen -- a configuration error must never look
+    # like a live run already started. The real, possibly-live context is
+    # built further down, only once validation has passed and (for a
+    # non-dry-run) we are actually about to execute.
+    probe_ctx = build_context(requested_live=False, config_path=args.config)
+
+    factorial_config = probe_ctx.config.lab01_factorial
     if factorial_config is None:
         print(
             "Lab01 factorial mode requires a [lab01.factorial] section in your config file "
@@ -151,7 +162,7 @@ def run_factorial(args: argparse.Namespace) -> None:
         print("Lab01 factorial mode is disabled for this config (lab01.factorial.enabled = false).")
         return
 
-    model = args.model or ctx.config.groq.default_model
+    model = args.model or probe_ctx.config.groq.default_model
     prompts = args.prompt or list(factorial_config.prompts)
     reasoning_efforts = args.reasoning_effort or list(factorial_config.reasoning_efforts)
     repetitions = args.repetitions or factorial_config.repetitions
@@ -171,6 +182,18 @@ def run_factorial(args: argparse.Namespace) -> None:
         )
         return
 
+    # `effective_factorial_config`, NOT `factorial_config`, is this run's source
+    # of truth from here on: --prompt/--reasoning-effort/--repetitions override
+    # the TOML file's values, and every downstream consumer (terminal header,
+    # resume fingerprint, manifest, analysis report) must agree on what was
+    # ACTUALLY planned, not silently fall back to the original TOML values.
+    effective_factorial_config = replace(
+        factorial_config,
+        prompts=tuple(prompts),
+        reasoning_efforts=tuple(reasoning_efforts),
+        repetitions=repetitions,
+    )
+
     try:
         conditions = build_conditions(
             prompts, reasoning_efforts, factorial_config.temperatures, factorial_config.top_p_values
@@ -187,17 +210,17 @@ def run_factorial(args: argparse.Namespace) -> None:
         factorial_config.use_paired_api_seed,
     )
 
-    _print_plan_header(model, factorial_config, conditions, plan, live_enabled=requested_live)
+    _print_plan_header(model, effective_factorial_config, conditions, plan, live_enabled=requested_live)
 
     experiment_run_id = args.experiment_run_id or _generate_run_id()
-    run_dir = factorial_run_dir(ctx.output_dir, experiment_run_id)
+    run_dir = factorial_run_dir(probe_ctx.output_dir, experiment_run_id)
 
     if args.dry_run:
         write_experiment_plan_csv(run_dir, plan)
         print(f"\nDry run only -- plan written to {run_dir / 'experiment_plan.csv'}. No API calls were made.")
         return
 
-    if not ctx.live:
+    if not requested_live:
         print(
             "\nLab01 factorial mode requires --live (and execution.live_api_enabled=true) to "
             "make real measurements against the Groq API; nothing was executed. Use --dry-run "
@@ -205,8 +228,23 @@ def run_factorial(args: argparse.Namespace) -> None:
         )
         return
 
+    # Only now -- configuration and matrix validation already passed, and
+    # we are genuinely about to execute -- build the real context. This is
+    # the first point where [COST WARNING] may print and a real Groq
+    # client gets constructed (constructing the SDK client makes no network
+    # call by itself; that only happens inside execute_planned_call below).
+    # requested_live is True here, so this either raises LiveExecutionNotAllowed
+    # (execution.live_api_enabled=false in this config -- same behavior as
+    # every other lab's CLI) or returns a context with ctx.live is True.
+    ctx = build_context(requested_live=True, config_path=args.config)
+
     try:
-        validate_resume_fingerprint(run_dir, factorial_config, model)
+        # Fingerprinted on the EFFECTIVE config: resuming the same
+        # --experiment-run-id with different --prompt/--reasoning-effort/
+        # --repetitions flags (even against the identical TOML file) is a
+        # different experiment design and must be refused, not silently
+        # accepted because the underlying TOML happened not to change.
+        validate_resume_fingerprint(run_dir, effective_factorial_config, model)
     except ResumeConfigurationMismatch as exc:
         print(f"\n{exc}")
         return
@@ -217,7 +255,9 @@ def run_factorial(args: argparse.Namespace) -> None:
 
     manifest = read_manifest(run_dir)
     if manifest is None:
-        manifest = build_initial_manifest(experiment_run_id, factorial_config, model, len(conditions), len(plan))
+        manifest = build_initial_manifest(
+            experiment_run_id, effective_factorial_config, model, len(conditions), len(plan)
+        )
         write_manifest(run_dir, manifest)
     write_experiment_plan_csv(run_dir, plan)
 

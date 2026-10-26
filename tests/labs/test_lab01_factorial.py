@@ -523,6 +523,224 @@ use_paired_api_seed = false{extra_budget}
 """
 
 
+def _full_matrix_toml(tmp_path, repetitions=10, live=True) -> str:
+    """Mirrors config/default.toml's real [lab01.factorial] matrix (2 prompts
+    x 3 efforts x 3 temperatures x 3 top_p = 54 conditions) so CLI-level
+    --prompt/--reasoning-effort filtering has something real to filter."""
+    return f"""
+[groq]
+default_model = "openai/gpt-oss-20b"
+request_timeout_seconds = 30.0
+
+[execution]
+live_api_enabled = {"true" if live else "false"}
+cost_warning_message = "warning"
+
+[experiment]
+default_repetitions = 2
+results_dir = "{(tmp_path / "results").as_posix()}"
+
+[retry]
+max_attempts = 2
+base_delay_seconds = 0.001
+max_delay_seconds = 0.002
+jitter = false
+
+[concurrency]
+max_concurrent_requests = 2
+
+[pricing.models."openai/gpt-oss-20b"]
+input_per_1m_usd = 0.075
+output_per_1m_usd = 0.30
+cached_input_per_1m_usd = 0.0375
+price_verified_date = "2026-10-21"
+
+[lab03]
+caching_capable_models = ["openai/gpt-oss-20b"]
+
+[lab05]
+small_model = "openai/gpt-oss-20b"
+large_model = "openai/gpt-oss-20b"
+
+[lab09]
+batch_completion_window = "24h"
+
+[lab01.factorial]
+enabled = true
+prompts = ["short_prompt", "long_prompt"]
+reasoning_efforts = ["low", "medium", "high"]
+temperatures = [0.5, 1.0, 1.5]
+top_p_values = [0.7, 0.9, 1.0]
+repetitions = {repetitions}
+max_completion_tokens = 64
+randomize_execution_order = false
+randomization_seed = 1
+use_paired_api_seed = false
+max_api_calls = 1000
+max_estimated_cost_usd = 100.0
+"""
+
+
+# --- Regression: CLI overrides must propagate through the WHOLE chain ----
+#
+# Bug report: `--repetitions 1` correctly produced 9 planned calls (9
+# conditions x 1 rep) but the terminal still printed "Repetitions: 10" --
+# the display, the resume fingerprint, and the manifest were all reading
+# the ORIGINAL TOML config instead of the EFFECTIVE (CLI-overridden) one.
+
+
+def test_dry_run_terminal_header_shows_effective_not_original_repetitions(tmp_path, capsys):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(_full_matrix_toml(tmp_path, repetitions=10, live=False), encoding="utf-8")
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "lab01", "factorial", "--dry-run",
+            "--prompt", "short_prompt",
+            "--reasoning-effort", "low",
+            "--repetitions", "1",
+            "--config", str(config_path),
+        ]
+    )
+    args.func(args)
+
+    out = capsys.readouterr().out
+    assert "Repetitions:            1" in out
+    assert "Unique Conditions:      9" in out
+    assert "Planned API Calls:      9" in out
+    assert "Repetitions:            10" not in out
+
+
+def test_dry_run_plan_csv_uses_effective_repetitions_only(tmp_path):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(_full_matrix_toml(tmp_path, repetitions=10, live=False), encoding="utf-8")
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "lab01", "factorial", "--dry-run",
+            "--prompt", "short_prompt",
+            "--reasoning-effort", "low",
+            "--repetitions", "1",
+            "--config", str(config_path),
+        ]
+    )
+    args.func(args)
+
+    run_dirs = list((tmp_path / "results" / "lab01_factorial").iterdir())
+    [run_dir] = run_dirs
+    import csv
+
+    with open(run_dir / "experiment_plan.csv", newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    assert len(rows) == 9
+    assert {row["repetition_index"] for row in rows} == {"1"}
+
+
+def test_live_execution_manifest_and_summary_use_effective_repetitions(monkeypatch, tmp_path, make_response):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(_full_matrix_toml(tmp_path, repetitions=10, live=True), encoding="utf-8")
+    fake_class = _patch_groq(monkeypatch, [make_response(completion_tokens=10) for _ in range(9)])
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "lab01", "factorial", "--live",
+            "--prompt", "short_prompt",
+            "--reasoning-effort", "low",
+            "--repetitions", "1",
+            "--experiment-run-id", "effective-repetitions-test",
+            "--config", str(config_path),
+        ]
+    )
+    args.func(args)
+
+    # exactly one API call per condition (9 conditions x 1 repetition), never 10x more
+    assert len(fake_class.completions.calls) == 9
+
+    run_dir = tmp_path / "results" / "lab01_factorial" / "effective-repetitions-test"
+    manifest = json.loads((run_dir / "experiment_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["experiment_configuration"]["repetitions"] == 1
+    assert manifest["planned_calls"] == 9
+
+    summary = json.loads((run_dir / "factorial_summary.json").read_text(encoding="utf-8"))
+    assert summary["planned_calls"] == 9
+    assert summary["successful_calls"] == 9
+    for condition_summary in summary["conditions"]:
+        assert condition_summary["planned_calls"] == 1  # the effective (overridden) value, not the TOML's 10
+
+    import csv
+
+    with open(run_dir / "condition_summary.csv", newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    assert len(rows) == 9
+    assert all(row["planned_calls"] == "1" for row in rows)
+
+
+def test_single_condition_one_repetition_plans_and_executes_exactly_one_call(monkeypatch, tmp_path, make_response):
+    # _minimal_toml's matrix is exactly 1 prompt x 1 effort x 1 temperature x
+    # 1 top_p = 1 condition, with its TOML repetitions=10 overridden to 1.
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(_minimal_toml(tmp_path, repetitions=10, live=True), encoding="utf-8")
+    fake_class = _patch_groq(monkeypatch, [make_response(completion_tokens=5)])
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "lab01", "factorial", "--live",
+            "--repetitions", "1",
+            "--experiment-run-id", "single-condition-test",
+            "--config", str(config_path),
+        ]
+    )
+    args.func(args)
+
+    assert len(fake_class.completions.calls) == 1  # exactly one condition x one repetition
+
+    run_dir = tmp_path / "results" / "lab01_factorial" / "single-condition-test"
+    measurements = read_existing_measurements(run_dir)
+    assert len(measurements) == 1
+
+
+def test_no_cli_override_preserves_toml_default_repetitions(monkeypatch, tmp_path, make_response, capsys):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(_minimal_toml(tmp_path, repetitions=4, live=False), encoding="utf-8")
+
+    parser = build_parser()
+    args = parser.parse_args(["lab01", "factorial", "--dry-run", "--config", str(config_path)])
+    args.func(args)
+
+    out = capsys.readouterr().out
+    assert "Repetitions:            4" in out
+    assert "Planned API Calls:      4" in out  # 1 condition x 4 repetitions
+
+
+def test_resume_with_different_repetitions_override_is_refused(monkeypatch, tmp_path, make_response):
+    # Same TOML file, same --experiment-run-id, but a DIFFERENT --repetitions
+    # override between the two invocations: this is a different experiment
+    # design and must be refused, not silently resumed just because the
+    # underlying TOML file didn't change.
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(_minimal_toml(tmp_path, repetitions=10, live=True), encoding="utf-8")
+    _patch_groq(monkeypatch, [make_response()])
+
+    parser = build_parser()
+    args = parser.parse_args(
+        ["lab01", "factorial", "--live", "--repetitions", "1", "--experiment-run-id", "mismatched-override", "--config", str(config_path)]
+    )
+    args.func(args)
+
+    args2 = parser.parse_args(
+        ["lab01", "factorial", "--live", "--repetitions", "2", "--experiment-run-id", "mismatched-override", "--config", str(config_path)]
+    )
+    args2.func(args2)  # must not raise -- reported as a printed message, same convention as other config errors
+
+    run_dir = tmp_path / "results" / "lab01_factorial" / "mismatched-override"
+    # only the one measurement from the first (valid) invocation
+    assert len(read_existing_measurements(run_dir)) == 1
+
+
 def test_json_serialization_round_trip(tmp_path):
     run_dir = factorial_run_dir(tmp_path, "run-1")
     m = _make_measurement()
@@ -799,6 +1017,34 @@ def test_retry_recovers_from_one_transient_failure_without_duplicate_measurement
     assert measurements[0].succeeded is True
     assert measurements[0].attempts_used == 2
     assert measurements[0].completion_tokens == 15
+
+
+def test_missing_factorial_section_is_rejected_before_any_cost_warning_or_client_construction(
+    monkeypatch, tmp_path, capsys
+):
+    # Regression test for a real bug report: a config file predating this
+    # feature (missing [lab01.factorial] entirely) combined with --live and
+    # a valid-looking API key must fail with ONLY the clear configuration
+    # error -- it must never print [COST WARNING] or construct a real Groq
+    # client first, which would wrongly suggest a live run had started.
+    toml_without_factorial_section = _minimal_toml(tmp_path, repetitions=1, live=True).split("[lab01.factorial]")[0]
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(toml_without_factorial_section, encoding="utf-8")
+    monkeypatch.setenv("GROQ_API_KEY", "fake-key-not-real")
+
+    def _fail_if_called(*a, **kw):
+        raise AssertionError("must not construct a Groq client before factorial config validation")
+
+    monkeypatch.setattr("lab_core.lab_cli_support.Groq", _fail_if_called)
+    monkeypatch.setattr("lab_core.lab_cli_support.AsyncGroq", _fail_if_called)
+
+    parser = build_parser()
+    args = parser.parse_args(["lab01", "factorial", "--live", "--config", str(config_path)])
+    args.func(args)  # must not raise -- _fail_if_called would have raised if client construction was attempted
+
+    captured = capsys.readouterr()
+    assert "[COST WARNING]" not in captured.out
+    assert "[lab01.factorial] section" in captured.out
 
 
 def test_non_retryable_error_is_recorded_as_a_failed_call_without_retrying_or_aborting_the_run(monkeypatch, tmp_path):
