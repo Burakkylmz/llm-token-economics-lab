@@ -466,6 +466,27 @@ def test_manifest_records_real_provider_model_prompt_and_effort(monkeypatch, tmp
     assert manifest["experiment_configuration"]["reasoning_efforts"] == ["low", "medium", "high"]
 
 
+def test_successful_live_run_auto_generates_charts(monkeypatch, tmp_path, make_response):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(_toml(tmp_path, repetitions=1, live=True), encoding="utf-8")
+    _patch_groq(monkeypatch, [make_response() for _ in range(3)])
+
+    parser = build_parser()
+    args = parser.parse_args(["lab01", "effort", "--live", "--experiment-run-id", "chart-test", "--config", str(config_path)])
+    args.func(args)
+
+    run_dir = tmp_path / "results" / "lab01_effort" / "chart-test"
+    charts_dir = run_dir / "charts"
+    assert charts_dir.is_dir()
+    png_files = list(charts_dir.glob("*.png"))
+    assert len(png_files) == 6
+    for png in png_files:
+        assert png.stat().st_size > 0
+    # Auto-generated charts must never touch the measurement/report files.
+    assert (run_dir / "raw_measurements.json").exists()
+    assert (run_dir / "analysis_report.md").exists()
+
+
 def test_resume_fingerprint_rejects_wrong_configuration(tmp_path):
     config_a = _effort_config(repetitions=2)
     config_b = _effort_config(repetitions=5)

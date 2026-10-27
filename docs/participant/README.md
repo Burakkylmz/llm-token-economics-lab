@@ -174,6 +174,20 @@ uv run lab-cli lab01 effort --dry-run --prompt short_prompt long_prompt --config
 uv run lab-cli lab01 effort --live --config config/live.toml
 ```
 
+A successful live run automatically writes 6 PNG charts to
+`results/lab01_effort/<run_id>/charts/` (reasoning vs non-reasoning tokens,
+completion tokens/latency/cost/reasoning-ratio by effort, and a combined
+summary dashboard). To (re)generate charts for any already-completed run --
+including the retired `factorial` mode's old results -- without calling the
+API at all:
+
+```
+# Regenerate charts for every completed lab01_effort/lab01_factorial run:
+uv run lab-cli lab01 backfill
+# or, in Docker:
+docker compose run --rm lab-runner lab01 backfill
+```
+
 See `docs/instructor/README.md`'s "LAB01 -- Reasoning Effort Comparison"
 section for the full experimental design, statistics methodology, and
 troubleshooting guide (ask your instructor if you don't have access to

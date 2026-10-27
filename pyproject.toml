@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "groq>=0.32.0",
+    "matplotlib>=3.11.2",
 ]
 
 [dependency-groups]

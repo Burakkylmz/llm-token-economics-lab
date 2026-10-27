@@ -7,6 +7,7 @@ from dataclasses import asdict
 from lab_core.lab_cli_support import add_common_arguments, build_context
 from lab_core.metrics import ExperimentResult
 from lab_core.results_writer import append_csv, write_json
+from labs.lab01_token_anatomy.charts_cli import add_backfill_arguments, run_backfill
 from labs.lab01_token_anatomy.effort_cli import add_effort_arguments, run_effort
 from labs.lab01_token_anatomy.experiments import EXPERIMENTS, run_experiment
 from labs.lab01_token_anatomy.observability import summarize_values, tally_finish_reasons
@@ -132,6 +133,9 @@ def _run(args: argparse.Namespace) -> None:
     if args.experiment == "effort":
         run_effort(args)
         return
+    if args.experiment == "backfill":
+        run_backfill(args)
+        return
 
     ctx = build_context(requested_live=args.live, config_path=args.config)
     if not ctx.live:
@@ -171,12 +175,14 @@ def register(subparsers: "argparse._SubParsersAction") -> None:
     parser = subparsers.add_parser(LAB_ID, help="Lab01 - Token Anatomy & Cost Calculation")
     parser.add_argument(
         "experiment",
-        choices=[*EXPERIMENTS.keys(), "all", "effort", "factorial"],
+        choices=[*EXPERIMENTS.keys(), "all", "effort", "factorial", "backfill"],
         help="short_prompt/long_prompt/all run Lab01's basic mode; effort runs the "
         "reasoning_effort-only comparison experiment; factorial is retired and always "
-        "fails closed (see `lab01 effort`).",
+        "fails closed (see `lab01 effort`); backfill (re)generates PNG charts from "
+        "existing results, offline, without any API key.",
     )
     parser.add_argument("--model", default=None, help="Groq model id (default: config groq.default_model).")
     add_common_arguments(parser)
     add_effort_arguments(parser)
+    add_backfill_arguments(parser)
     parser.set_defaults(func=_run)
