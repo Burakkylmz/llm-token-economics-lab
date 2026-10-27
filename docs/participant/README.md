@@ -148,6 +148,12 @@ reasoning tokens, when available) and is also written to
 treat that summary as descriptive of one run, not a statistically robust
 benchmark.
 
+The same command also writes PNG charts automatically -- no extra command
+needed. Check `results/lab01_token_anatomy/charts/` for `short_prompt_*.png`
+/ `long_prompt_*.png` (completion tokens per run, reasoning vs
+non-reasoning tokens, finish reasons, and a combined `*_dashboard.png`).
+This applies to `short_prompt`, `long_prompt`, and `all` alike.
+
 ### Lab01 effort mode -- reasoning_effort comparison
 
 A separate execution mode compares `reasoning_effort` levels only
@@ -196,34 +202,151 @@ that file).
 ## Lab02 -- Context Growth & Context Bloat
 
 **Objective:** observe how growing or padding the context before a
-question changes prompt_tokens, cost, and latency -- while the question
-and its correct answer stay the same.
+question changes prompt_tokens, reasoning tokens, cost, latency, and
+answer correctness -- while the question, expected answer, and system
+instruction stay identical across conditions.
+
+This project's documented default plans exactly 10 API calls: 3 context
+conditions (`minimal_context`, `expanded_context`, `irrelevant_context`) x
+2 repetitions, plus 4 `multi_turn_growth` turns.
+
+Preview the plan first, with no API key and no cost, via `--dry-run`:
 
 ```
-uv run lab-cli lab02 all --live --config config/live.toml --turns 5
+uv run lab-cli lab02 all --dry-run --config config/default.toml
 ```
 
-Compare `minimal_context`, `expanded_context`, and `irrelevant_context`:
-only `prompt_tokens` and timing should move; the model should still answer
-correctly in all three, since the relevant fact is present in every
-condition. Then look at `multi_turn_growth`: prompt_tokens should increase
-turn over turn as conversation history accumulates.
+Then run it for real:
+
+```
+uv run lab-cli lab02 all --live --config config/live.toml
+```
+
+Each run writes into its own isolated results folder --
+`results/lab02_context_growth/<experiment_run_id>/` -- containing
+`context_measurements.json/.csv`, `multi_turn_measurements.json/.csv`,
+`condition_summary.csv`, `experiment_summary.json`, `analysis_report.md`,
+and PNG charts in `charts/`, written automatically in the same command
+(no extra step). A CLI override that would push the total above
+`lab02.max_api_calls` (10 by default) is refused up front, before any API
+call is made -- lower `--repetitions`/`--turns`, or raise
+`lab02.max_api_calls` deliberately in your own config.
+
+Compare `minimal_context`, `expanded_context`, and `irrelevant_context` in
+`charts/context_size_vs_latency.png` / `token_breakdown.png` /
+`reasoning_tokens_by_context.png` / `estimated_cost_by_context.png` /
+`answer_correctness.png`: `prompt_tokens`, reasoning-token usage, and
+timing should move with context size/relevance, while
+`answer_correctness.png` should show every condition still answering
+correctly most of the time, since the relevant fact is present in every
+condition (answer correctness is graded by a strict exact-integer check,
+not a substring match -- see `docs/instructor/README.md`). Then look at
+`multi_turn_growth.png` / `cumulative_token_consumption.png`:
+`prompt_tokens` increases turn over turn, and the *cumulative* input-token
+total across the whole conversation grows even faster, since every prior
+turn's reply is re-sent as input on every later turn.
+
+To regenerate charts for existing Lab02 results (both new per-run folders
+and the pre-redesign flat `results/lab02_context_growth.json` file)
+without making any API call:
+
+```
+uv run lab-cli lab02 backfill
+# or, in Docker:
+docker compose run --rm lab-runner lab02 backfill
+```
+
+See `docs/instructor/README.md`'s "LAB02 -- Context Growth & Context
+Bloat" section for the full experimental design, the answer-correctness
+evaluator, and documented confounders (ask your instructor if you don't
+have access to that file).
 
 ## Lab03 -- Prompt Caching
 
 **Objective:** observe Groq's automatic prompt caching (currently
 `openai/gpt-oss-20b`, `openai/gpt-oss-120b`, `openai/gpt-oss-safeguard-20b`
-only) in action.
+only), measure its effect on cost and latency, and distinguish
+"cache-eligible" from "an actually observed cache hit".
+
+The default experiment is a small, paired/interleaved 6-call plan: 3
+repetitions x 2 conditions (`repeated_prefix`, `cache_unfriendly`), run as
+pair 1 (`repeated_prefix` then `cache_unfriendly`), pair 2, pair 3 -- never
+all of one condition followed by all of the other. Both conditions in a
+pair ask the SAME paired question (one of 4 built-in questions, each with
+its own deterministic integer answer drawn from a realistic customer-
+support knowledge base) and have comparable prompt length; the only thing
+that systematically differs is whether the leading prefix can repeat
+byte-for-byte across calls.
 
 ```
+uv run lab-cli lab03 all --dry-run --config config/live.toml
 uv run lab-cli lab03 all --live --config config/live.toml
 ```
 
-Compare `repeated_prefix` (identical long system prompt every call) vs
-`cache_unfriendly` (a unique nonce prepended every call, so no exact-prefix
-match is possible). Check `cached_tokens` and the printed observed cache
-hit rate. **A cache miss on `repeated_prefix` is not necessarily a bug** --
-caching is provider-managed, has a 2-hour TTL, and is never guaranteed.
+`--repetitions 2` gives a 4-call minimal pilot; `--repetitions 4` gives an
+8-call extended run (this project's documented ceiling,
+`lab03.max_api_calls`). You can also run only one condition:
+`uv run lab-cli lab03 repeated_prefix --live --config config/live.toml`.
+
+**`cache_probe` -- the strongest exact-match condition.** If `lab03 all`
+never shows a cache hit, run the dedicated probe mode first: it sends 3
+(default, `lab03.cache_probe_calls`) sequential, BYTE-IDENTICAL requests
+(same system tag, same knowledge base, same exact user question -- not
+just a shared prefix) -- the single strongest condition this project can
+construct for observing `cached_tokens > 0`.
+
+```
+uv run lab-cli lab03 cache_probe --dry-run --config config/live.toml
+uv run lab-cli lab03 cache_probe --live --config config/live.toml
+```
+
+The dry-run prints an offline "Prefix Stability Verification" block
+(hash + lengths) proving the 3 planned requests really are identical,
+before any API call. The live run ends with a `Cache Verification:
+OBSERVED`/`NOT OBSERVED` line and a concrete, evidence-based reason --
+never a bare pass/fail.
+
+**Results and charts.** Every live run writes to its own
+`results/lab03_prompt_caching/<experiment_run_id>/` directory
+(`cache_measurements.json`/`.csv`, `cache_diagnostics.json`,
+`condition_summary.csv`, `experiment_summary.json`, `analysis_report.md`)
+and never touches or overwrites the older flat
+`results/lab03_prompt_caching.json`/`.csv` files. `cache_diagnostics.json`
+is a small, bounded, safe projection (provider model, SDK version,
+request number, token counts, cache status, raw usage field names) --
+never prompt or completion text.
+
+Charts are generated automatically -- no extra command needed -- into
+`<run_id>/charts/`: cached vs. uncached input tokens, cache hit/miss/
+unavailable by request, token cache ratio by request, a cache-friendly-
+vs-unfriendly comparison, estimated cost by condition, estimated cost
+savings, latency by condition, cached tokens vs. latency, a summary
+dashboard, and (for `cache_probe` runs only) an exact-match probe
+sequence chart.
+
+**Two different cache metrics, shown separately, never confused:**
+"observed request cache hit rate" (what fraction of REQUESTS had any
+cache hit) and "token cache ratio" (what fraction of all prompt TOKENS,
+across reporting requests, were cached) answer different questions and
+are not interchangeable.
+
+**A cache miss on `repeated_prefix` is not necessarily a bug** -- caching
+is provider-managed, has an approximate multi-hour TTL, and is never
+guaranteed. Every call is classified into one of 4 statuses
+(`CACHE_HIT` / `CACHE_MISS` / `CACHE_USAGE_UNAVAILABLE` / `INVALID_USAGE`),
+printed as `Cache Status:` on every call and shown in its own
+"Cache Hit / Miss / Unavailable by Request" chart.
+`CACHE_USAGE_UNAVAILABLE` (the provider never reported cache usage for
+that call at all) is NEVER the same thing as `CACHE_MISS` (the provider
+reported `cached_tokens == 0`) -- if you only ever see
+`CACHE_USAGE_UNAVAILABLE`, that is not an SDK bug on this project's side
+(see the instructor guide's root-cause section for how that was verified).
+
+Use `uv run lab-cli lab03 backfill --config config/live.toml` to
+regenerate charts for any existing run directory, or from the legacy flat
+file, without making any API call (no `GROQ_API_KEY` needed). The legacy
+backfill never produces an answer-correctness chart, since the old flat
+file never stored response text to evaluate.
 
 ## Lab04 -- Output Control & Invocation Optimization
 

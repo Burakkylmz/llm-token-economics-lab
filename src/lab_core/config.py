@@ -61,7 +61,27 @@ class Lab05Config:
 
 @dataclass(frozen=True)
 class Lab03Config:
+    """Lab03's prompt-caching experiment.
+
+    `caching_capable_models` was already required before this redesign;
+    every other field is new and optional with safe, documented defaults
+    (see _build_lab03 below), so a config file that only ever set
+    `caching_capable_models` keeps loading and running `lab03 all --live`
+    unchanged -- exactly this project's documented 6-call default (3
+    paired repetitions x 2 conditions).
+    """
+
     caching_capable_models: tuple[str, ...]
+    repetitions: int
+    max_completion_tokens: int
+    randomize_condition_order_within_pair: bool
+    randomization_seed: int
+    max_api_calls: Optional[int]
+    max_estimated_cost_usd: Optional[float]
+    # Number of sequential, byte-identical requests `lab03 cache_probe`
+    # sends by default -- a separate, smaller budget from `repetitions`
+    # above (which governs `lab03 all`/single-condition modes).
+    cache_probe_calls: int
 
 
 @dataclass(frozen=True)
@@ -134,6 +154,28 @@ class Lab01EffortConfig:
 
 
 @dataclass(frozen=True)
+class Lab02Config:
+    """Lab02's context-growth/context-bloat experiment.
+
+    Unlike Lab01FactorialConfig/Lab01EffortConfig, this section is NOT
+    optional at the AppConfig level: `lab02 all --live` must keep working
+    with its documented 10-call default even for a config/live.toml that
+    predates this feature and has no [lab02] section at all (see
+    _build_lab02 below, which fills in these exact defaults when the
+    section is absent).
+    """
+
+    enabled: bool
+    repetitions: int
+    multi_turn_turns: int
+    max_completion_tokens: int
+    randomize_context_order: bool
+    randomization_seed: int
+    max_api_calls: Optional[int]
+    max_estimated_cost_usd: Optional[float]
+
+
+@dataclass(frozen=True)
 class AppConfig:
     groq: GroqConfig
     execution: ExecutionConfig
@@ -141,6 +183,7 @@ class AppConfig:
     retry: RetryConfig
     concurrency: ConcurrencyConfig
     pricing: dict[str, ModelPricing]
+    lab02: Lab02Config
     lab03: Lab03Config
     lab05: Lab05Config
     lab09: Lab09Config
@@ -232,12 +275,190 @@ def _build_pricing(raw: dict) -> dict[str, ModelPricing]:
     return pricing
 
 
+def _build_lab02(raw: dict) -> Lab02Config:
+    """Optional [lab02] section with safe, documented defaults: 3 context
+    conditions x 2 repetitions (6 calls) + 4 multi-turn calls = 10 planned
+    calls by default, matching this project's default experiment matrix.
+    A config file that omits [lab02] entirely gets exactly these defaults,
+    so `lab02 all --live` keeps working unchanged on pre-existing configs.
+    """
+    section = raw.get("lab02", {})
+
+    enabled = section.get("enabled", True)
+    if not isinstance(enabled, bool):
+        raise ConfigError("lab02.enabled must be a boolean")
+
+    repetitions = section.get("repetitions", 2)
+    if isinstance(repetitions, bool) or not isinstance(repetitions, int) or repetitions < 1:
+        raise ConfigError("lab02.repetitions must be a positive integer")
+
+    multi_turn_turns = section.get("multi_turn_turns", 4)
+    if isinstance(multi_turn_turns, bool) or not isinstance(multi_turn_turns, int) or multi_turn_turns < 1:
+        raise ConfigError("lab02.multi_turn_turns must be a positive integer")
+
+    # Large enough that a short, strictly-formatted integer answer is never
+    # truncated by its own reasoning overhead (finish_reason="length" is
+    # still recorded on every call so truncation stays visible if it
+    # happens), but far below this project's factorial-scale 4096 default
+    # since Lab02's answers are intentionally one short token.
+    max_completion_tokens = section.get("max_completion_tokens", 2048)
+    if (
+        isinstance(max_completion_tokens, bool)
+        or not isinstance(max_completion_tokens, int)
+        or max_completion_tokens < 1
+    ):
+        raise ConfigError("lab02.max_completion_tokens must be a positive integer")
+
+    randomize_context_order = section.get("randomize_context_order", False)
+    if not isinstance(randomize_context_order, bool):
+        raise ConfigError("lab02.randomize_context_order must be a boolean")
+
+    randomization_seed = section.get("randomization_seed", 42)
+    if isinstance(randomization_seed, bool) or not isinstance(randomization_seed, int):
+        raise ConfigError("lab02.randomization_seed must be an integer")
+
+    # Exactly this project's documented default experiment matrix (3
+    # conditions x 2 repetitions + 4 multi-turn calls). A CLI override
+    # (--repetitions/--turns) that would push the plan above this is
+    # refused before any API call -- see labs.lab02_context_growth.cli.
+    max_api_calls = section.get("max_api_calls", 10)
+    if max_api_calls is not None:
+        if isinstance(max_api_calls, bool) or not isinstance(max_api_calls, int) or max_api_calls < 1:
+            raise ConfigError("lab02.max_api_calls must be a positive integer or omitted")
+
+    # Worst case at the 10-call default: 10 x 2048 max_completion_tokens x
+    # $0.30/1e6 (gpt-oss-20b output price) = $0.00614, plus a negligible
+    # prompt-token share. $0.05 leaves generous headroom while still being
+    # a real, enforced cap rather than "unlimited".
+    max_estimated_cost_usd = section.get("max_estimated_cost_usd", 0.05)
+    if max_estimated_cost_usd is not None:
+        if (
+            isinstance(max_estimated_cost_usd, bool)
+            or not isinstance(max_estimated_cost_usd, (int, float))
+            or max_estimated_cost_usd <= 0
+        ):
+            raise ConfigError("lab02.max_estimated_cost_usd must be a positive number or omitted")
+        max_estimated_cost_usd = float(max_estimated_cost_usd)
+
+    known_keys = {
+        "enabled",
+        "repetitions",
+        "multi_turn_turns",
+        "max_completion_tokens",
+        "randomize_context_order",
+        "randomization_seed",
+        "max_api_calls",
+        "max_estimated_cost_usd",
+    }
+    unknown_keys = set(section.keys()) - known_keys
+    if unknown_keys:
+        raise ConfigError(f"lab02 has unknown configuration key(s): {sorted(unknown_keys)}")
+
+    return Lab02Config(
+        enabled=enabled,
+        repetitions=repetitions,
+        multi_turn_turns=multi_turn_turns,
+        max_completion_tokens=max_completion_tokens,
+        randomize_context_order=randomize_context_order,
+        randomization_seed=randomization_seed,
+        max_api_calls=max_api_calls,
+        max_estimated_cost_usd=max_estimated_cost_usd,
+    )
+
+
 def _build_lab03(raw: dict) -> Lab03Config:
+    """`caching_capable_models` remains required (unchanged from before this
+    redesign). The new fields below are optional with documented defaults
+    matching this project's default 6-call paired experiment (3 repetitions
+    x 2 conditions): a config that predates this redesign and only ever
+    set caching_capable_models keeps working identically.
+    """
     section = raw.get("lab03", {})
     models = _require(section, "caching_capable_models", "lab03")
     if not isinstance(models, list) or not all(isinstance(m, str) for m in models):
         raise ConfigError("lab03.caching_capable_models must be a list of strings")
-    return Lab03Config(caching_capable_models=tuple(models))
+
+    repetitions = section.get("repetitions", 3)
+    if isinstance(repetitions, bool) or not isinstance(repetitions, int) or repetitions < 1:
+        raise ConfigError("lab03.repetitions must be a positive integer")
+
+    # Large enough that a short, strictly-formatted integer answer is never
+    # truncated by its own reasoning overhead (finish_reason="length" is
+    # still recorded on every call so truncation stays visible), matching
+    # Lab02's same documented rationale -- deliberately NOT the task
+    # spec's own illustrative 512, which this project's live-verified
+    # reasoning-token observations (see docs/instructor/README.md) show is
+    # too tight a margin for a gpt-oss reasoning model on some calls.
+    max_completion_tokens = section.get("max_completion_tokens", 2048)
+    if (
+        isinstance(max_completion_tokens, bool)
+        or not isinstance(max_completion_tokens, int)
+        or max_completion_tokens < 1
+    ):
+        raise ConfigError("lab03.max_completion_tokens must be a positive integer")
+
+    randomize_condition_order_within_pair = section.get("randomize_condition_order_within_pair", False)
+    if not isinstance(randomize_condition_order_within_pair, bool):
+        raise ConfigError("lab03.randomize_condition_order_within_pair must be a boolean")
+
+    randomization_seed = section.get("randomization_seed", 42)
+    if isinstance(randomization_seed, bool) or not isinstance(randomization_seed, int):
+        raise ConfigError("lab03.randomization_seed must be an integer")
+
+    # Exactly this project's documented default experiment matrix (3
+    # repetitions x 2 conditions = 6 calls). A CLI override (--repetitions)
+    # that would push the plan above this is refused before any API call.
+    max_api_calls = section.get("max_api_calls", 8)
+    if max_api_calls is not None:
+        if isinstance(max_api_calls, bool) or not isinstance(max_api_calls, int) or max_api_calls < 1:
+            raise ConfigError("lab03.max_api_calls must be a positive integer or omitted")
+
+    # Worst case at the 8-call extended-pilot ceiling: 8 x 2048
+    # max_completion_tokens x $0.30/1e6 (gpt-oss-20b output price) =
+    # $0.0049, plus a negligible prompt-token share. $0.05 leaves generous
+    # headroom while still being a real, enforced cap.
+    max_estimated_cost_usd = section.get("max_estimated_cost_usd", 0.05)
+    if max_estimated_cost_usd is not None:
+        if (
+            isinstance(max_estimated_cost_usd, bool)
+            or not isinstance(max_estimated_cost_usd, (int, float))
+            or max_estimated_cost_usd <= 0
+        ):
+            raise ConfigError("lab03.max_estimated_cost_usd must be a positive number or omitted")
+        max_estimated_cost_usd = float(max_estimated_cost_usd)
+
+    # `lab03 cache_probe`'s own, smaller, dedicated budget: 3 sequential,
+    # byte-identical requests by default -- the strongest exact-prefix-match
+    # condition this project can construct, independent of the 6-call
+    # paired-matrix `repetitions` default above.
+    cache_probe_calls = section.get("cache_probe_calls", 3)
+    if isinstance(cache_probe_calls, bool) or not isinstance(cache_probe_calls, int) or cache_probe_calls < 1:
+        raise ConfigError("lab03.cache_probe_calls must be a positive integer")
+
+    known_keys = {
+        "caching_capable_models",
+        "repetitions",
+        "max_completion_tokens",
+        "randomize_condition_order_within_pair",
+        "randomization_seed",
+        "max_api_calls",
+        "max_estimated_cost_usd",
+        "cache_probe_calls",
+    }
+    unknown_keys = set(section.keys()) - known_keys
+    if unknown_keys:
+        raise ConfigError(f"lab03 has unknown configuration key(s): {sorted(unknown_keys)}")
+
+    return Lab03Config(
+        caching_capable_models=tuple(models),
+        repetitions=repetitions,
+        max_completion_tokens=max_completion_tokens,
+        randomize_condition_order_within_pair=randomize_condition_order_within_pair,
+        randomization_seed=randomization_seed,
+        max_api_calls=max_api_calls,
+        max_estimated_cost_usd=max_estimated_cost_usd,
+        cache_probe_calls=cache_probe_calls,
+    )
 
 
 def _build_lab05(raw: dict) -> Lab05Config:
@@ -519,6 +740,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         retry=_build_retry(raw),
         concurrency=_build_concurrency(raw),
         pricing=_build_pricing(raw),
+        lab02=_build_lab02(raw),
         lab03=_build_lab03(raw),
         lab05=_build_lab05(raw),
         lab09=_build_lab09(raw),

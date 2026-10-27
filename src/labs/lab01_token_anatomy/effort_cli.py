@@ -350,10 +350,16 @@ def run_effort(args: argparse.Namespace) -> None:
     write_analysis_report(run_dir, report_markdown)
 
     if any(m.succeeded for m in measurements):
-        from labs.lab01_token_anatomy.effort_charts import generate_effort_charts
+        # Best-effort, strictly after every measurement/report file above is
+        # already written -- a charting failure must never cost an
+        # already-persisted measurement.
+        try:
+            from labs.lab01_token_anatomy.effort_charts import generate_effort_charts
 
-        chart_paths = generate_effort_charts(run_dir)
-        if chart_paths:
-            print(f"\nCharts written: {len(chart_paths)} -> {run_dir / 'charts'}")
+            chart_paths = generate_effort_charts(run_dir)
+            if chart_paths:
+                print(f"\nCharts written: {len(chart_paths)} -> {run_dir / 'charts'}")
+        except Exception as exc:  # noqa: BLE001 -- see comment above
+            print(f"\nChart generation failed (results above are unaffected): {exc}")
 
     _print_completion_summary(measurements, len(plan), run_dir, stopped_reason)

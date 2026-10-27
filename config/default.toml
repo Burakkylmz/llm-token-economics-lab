@@ -84,8 +84,99 @@ large_model = "openai/gpt-oss-120b"
 # Prompt caching is only supported on these Groq models today (Oct 2026).
 caching_capable_models = ["openai/gpt-oss-20b", "openai/gpt-oss-120b"]
 
+# Lab03's prompt-caching experiment. Unlike [lab01.factorial]/[lab01.effort]
+# below, only caching_capable_models above was ever required -- everything
+# below is new and optional with these exact defaults (see
+# lab_core.config._build_lab03), so a config predating this redesign still
+# works unchanged.
+
+# "Default Experiment": 3 paired repetitions x 2 conditions (repeated_prefix,
+# cache_unfriendly) = 6 calls. Override with `--repetitions 2` for a 4-call
+# minimal pilot, or `--repetitions 4` for an 8-call extended run.
+repetitions = 3
+
+# Large enough that a short, strictly-formatted integer answer is never
+# truncated by its own reasoning overhead (finish_reason="length" is still
+# recorded on every call so truncation stays visible), same rationale as
+# [lab02]'s max_completion_tokens below -- deliberately NOT the task
+# spec's own illustrative 512, which is too tight a margin for a gpt-oss
+# reasoning model on some calls.
+max_completion_tokens = 2048
+
+# At this small a scale (6-8 calls), randomizing which condition runs
+# first WITHIN each pair buys little bias-reduction on its own -- the
+# paired/interleaved execution order itself (pair 1: repeated_prefix,
+# cache_unfriendly; pair 2: ...; never all-of-one-condition-then-all-of-
+# the-other) is what actually fixes this lab's old sequential-block bias.
+# Off by default, but fully supported.
+randomize_condition_order_within_pair = false
+randomization_seed = 42
+
+# Request-count safety net: this project's documented "Extended Experiment"
+# ceiling (4 repetitions x 2 conditions = 8 calls) -- the largest planned
+# scope documented for this lab. A CLI override (--repetitions) that would
+# push the plan above this is refused before any API call is made -- raise
+# this deliberately, never by accident, if you intend more.
+max_api_calls = 8
+
+# Cost safety net, derived from this file's own [pricing] and
+# max_completion_tokens above: worst case at the 8-call extended ceiling is
+# 8 x 2048 x $0.30/1e6 (output) = $0.0049, plus a negligible prompt-token
+# share. $0.05 leaves generous headroom while still being a real, enforced
+# cap.
+max_estimated_cost_usd = 0.05
+
+# `lab03 cache_probe`'s own, separate, smaller budget: N sequential,
+# byte-identical requests -- the strongest exact-prefix-match condition
+# this project can construct, used specifically to investigate whether
+# cached_tokens > 0 is ever observed. Independent of `repetitions` above.
+cache_probe_calls = 3
+
 [lab09]
 batch_completion_window = "24h"
+
+[lab02]
+# Lab02's context-growth/context-bloat experiment. Unlike [lab01.effort]
+# below, this section is NOT required for Lab02 to work: omitting it
+# entirely (as this file did before this section existed) still gives you
+# exactly these same defaults (see lab_core.config._build_lab02) -- they
+# are baked in as the project's documented default experiment matrix: 3
+# context conditions x 2 repetitions + 4 multi-turn turns = 10 calls.
+enabled = true
+
+# "Profile B -- Default Experiment": 3 context conditions x 2 repetitions
+# = 6 calls. Override with `--repetitions 1` for a minimal 3-call pilot.
+repetitions = 2
+
+multi_turn_turns = 4
+
+# Large enough that a short, strictly-formatted integer answer is never
+# truncated by its own reasoning overhead (finish_reason="length" is still
+# recorded on every call so truncation stays visible), but far below this
+# project's factorial-scale 4096 default since Lab02's answers are
+# intentionally one short token.
+max_completion_tokens = 2048
+
+# At this small a scale (10 calls), randomizing the three context
+# conditions' execution order buys little bias-reduction and makes the
+# terminal output harder to follow -- off by default, but fully supported
+# (multi_turn_growth itself is never randomized/interleaved, since each of
+# its turns depends on the previous turn's reply).
+randomize_context_order = false
+randomization_seed = 42
+
+# Request-count safety net: exactly this project's documented default
+# matrix (3 x 2 + 4). A CLI override (--repetitions/--turns) that would
+# push the plan above this is refused before any API call is made --
+# raise this deliberately, never by accident, if you intend more.
+max_api_calls = 10
+
+# Cost safety net, derived from this file's own [pricing] and
+# max_completion_tokens above: worst case at the 10-call default is
+# 10 x 2048 x $0.30/1e6 (output) = $0.00614, plus a negligible
+# prompt-token share. $0.05 leaves generous headroom above that
+# completion-token ceiling while still being a real, enforced cap.
+max_estimated_cost_usd = 0.05
 
 # [lab01.factorial] (the temperature x top_p x reasoning_effort full
 # factorial engine, 540 calls by default) has been RETIRED -- it created

@@ -220,3 +220,126 @@ def test_lab01_factorial_negative_max_estimated_cost_rejected(tmp_path):
     broken = FACTORIAL_TOML + "\nmax_estimated_cost_usd = -1.0\n"
     with pytest.raises(ConfigError):
         load_config(_write(tmp_path, broken))
+
+
+# --- lab02: NOT optional, always present with safe defaults ---------------
+
+
+def test_lab02_section_absent_still_gets_documented_defaults(tmp_path):
+    # VALID_TOML has no [lab02] section at all -- `lab02 all --live` must
+    # still plan exactly this project's documented 10-call default.
+    config = load_config(_write(tmp_path, VALID_TOML))
+    lab02 = config.lab02
+    assert lab02.enabled is True
+    assert lab02.repetitions == 2
+    assert lab02.multi_turn_turns == 4
+    assert lab02.max_api_calls == 10
+
+
+def test_lab02_section_present_overrides_defaults(tmp_path):
+    toml = (
+        VALID_TOML
+        + """
+[lab02]
+enabled = true
+repetitions = 3
+multi_turn_turns = 5
+max_completion_tokens = 1024
+randomize_context_order = true
+randomization_seed = 7
+max_api_calls = 50
+max_estimated_cost_usd = 0.25
+"""
+    )
+    config = load_config(_write(tmp_path, toml))
+    lab02 = config.lab02
+    assert lab02.repetitions == 3
+    assert lab02.multi_turn_turns == 5
+    assert lab02.max_completion_tokens == 1024
+    assert lab02.randomize_context_order is True
+    assert lab02.randomization_seed == 7
+    assert lab02.max_api_calls == 50
+    assert lab02.max_estimated_cost_usd == 0.25
+
+
+def test_lab02_non_positive_repetitions_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab02]\nrepetitions = 0\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab02_unknown_key_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab02]\nnot_a_real_key = 1\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab02_negative_max_estimated_cost_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab02]\nmax_estimated_cost_usd = -1.0\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+# --- lab03: caching_capable_models stays required; everything else is new,
+#     optional, and backward compatible -------------------------------------
+
+
+def _with_lab03_overrides(extra_lines: str) -> str:
+    # VALID_TOML already has one [lab03] table -- TOML forbids a second
+    # [lab03] header, so new keys are injected into the EXISTING table
+    # rather than appended as a duplicate section.
+    return VALID_TOML.replace(
+        '[lab03]\ncaching_capable_models = ["openai/gpt-oss-20b", "openai/gpt-oss-120b"]\n',
+        '[lab03]\ncaching_capable_models = ["openai/gpt-oss-20b", "openai/gpt-oss-120b"]\n' + extra_lines,
+    )
+
+
+def test_lab03_section_with_only_legacy_key_still_gets_documented_defaults(tmp_path):
+    # VALID_TOML's [lab03] section only ever set caching_capable_models --
+    # `lab03 all --live` must still plan exactly this project's documented
+    # 6-call default.
+    config = load_config(_write(tmp_path, VALID_TOML))
+    lab03 = config.lab03
+    assert lab03.caching_capable_models == ("openai/gpt-oss-20b", "openai/gpt-oss-120b")
+    assert lab03.repetitions == 3
+    assert lab03.max_completion_tokens == 2048
+    assert lab03.randomize_condition_order_within_pair is False
+    assert lab03.max_api_calls == 8
+    assert lab03.max_estimated_cost_usd == 0.05
+
+
+def test_lab03_section_present_overrides_defaults(tmp_path):
+    toml = _with_lab03_overrides(
+        "repetitions = 4\n"
+        "max_completion_tokens = 1024\n"
+        "randomize_condition_order_within_pair = true\n"
+        "randomization_seed = 7\n"
+        "max_api_calls = 50\n"
+        "max_estimated_cost_usd = 0.25\n"
+    )
+    config = load_config(_write(tmp_path, toml))
+    lab03 = config.lab03
+    assert lab03.repetitions == 4
+    assert lab03.max_completion_tokens == 1024
+    assert lab03.randomize_condition_order_within_pair is True
+    assert lab03.randomization_seed == 7
+    assert lab03.max_api_calls == 50
+    assert lab03.max_estimated_cost_usd == 0.25
+
+
+def test_lab03_non_positive_repetitions_rejected(tmp_path):
+    broken = _with_lab03_overrides("repetitions = 0\n")
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab03_unknown_key_rejected(tmp_path):
+    broken = _with_lab03_overrides("not_a_real_key = 1\n")
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab03_negative_max_estimated_cost_rejected(tmp_path):
+    broken = _with_lab03_overrides("max_estimated_cost_usd = -1.0\n")
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))

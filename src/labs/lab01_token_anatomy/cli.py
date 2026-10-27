@@ -150,11 +150,13 @@ def _run(args: argparse.Namespace) -> None:
     experiment_names = list(EXPERIMENTS.keys()) if args.experiment == "all" else [args.experiment]
 
     all_results: list[ExperimentResult] = []
+    results_by_experiment: dict[str, list[ExperimentResult]] = {}
     summaries: list[dict] = []
     for experiment in experiment_names:
         print(f"Running lab01/{experiment} on {model} x{repetitions}...")
         results = run_experiment(ctx.client, ctx.config, experiment, model, repetitions)
         all_results.extend(results)
+        results_by_experiment[experiment] = results
         for i, result in enumerate(results, start=1):
             _print_run(i, len(results), result)
         summaries.append(_print_and_build_summary(experiment, model, results))
@@ -169,6 +171,20 @@ def _run(args: argparse.Namespace) -> None:
         json.dump(summaries, f, indent=2, ensure_ascii=False)
 
     print(f"\nResults written to {ctx.output_dir}/{output_name}.json, .csv, and _summary.json")
+
+    # Charts are generated from the in-memory results above, strictly after
+    # every measurement file has already been written -- a charting failure
+    # here must never cost an already-persisted measurement (hence the
+    # broad, logged-not-raised except: this is a best-effort convenience on
+    # top of complete, already-safe results, not part of the data path).
+    try:
+        from labs.lab01_token_anatomy.basic_charts import generate_basic_mode_charts
+
+        chart_paths = generate_basic_mode_charts(ctx.output_dir, output_name, results_by_experiment)
+        if chart_paths:
+            print(f"Charts written: {len(chart_paths)} -> {ctx.output_dir / output_name / 'charts'}")
+    except Exception as exc:  # noqa: BLE001 -- see comment above
+        print(f"Chart generation failed (results above are unaffected): {exc}")
 
 
 def register(subparsers: "argparse._SubParsersAction") -> None:
