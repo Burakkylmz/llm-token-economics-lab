@@ -60,10 +60,12 @@ batch_completion_window = "24h"
     )
 
     parser = build_parser()
-    args = parser.parse_args(["lab07", "no_backoff", "--fail-count", "1", "--config", str(config_path)])
+    args = parser.parse_args(
+        ["lab07", "no_backoff", "--fail-count", "1", "--experiment-run-id", "smoke-test", "--config", str(config_path)]
+    )
     args.func(args)
 
     captured = capsys.readouterr()
-    assert "fully simulated" in captured.out
-    assert "succeeded=True" in captured.out
-    assert (results_dir / "lab07_rate_limiting.json").exists()
+    assert "LAB07 IS SIMULATION ONLY" in captured.out
+    assert "No real API calls will be made" in captured.out
+    assert (results_dir / "lab07_rate_limiting" / "smoke-test" / "raw_measurements.json").exists()

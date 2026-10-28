@@ -80,6 +80,49 @@ price_verified_date = "2026-10-21"
 small_model = "openai/gpt-oss-20b"
 large_model = "openai/gpt-oss-120b"
 
+# Lab05's model-routing experiment. Unlike small_model/large_model above,
+# everything below is new and optional with these exact defaults (see
+# lab_core.config._build_lab05), so a config predating this redesign still
+# works unchanged.
+
+# "pilot" (4 tasks x 2 strategies = 8 calls) / "default" (6 tasks x 2
+# strategies = 12 calls) / "extended" (6 tasks x 3 strategies, adds the
+# always_large baseline = 18 calls). Override with `--profile`.
+default_profile = "default"
+
+# openai/gpt-oss-20b/120b only support these three reasoning_effort levels
+# (see SUPPORTED_REASONING_EFFORTS above). The SAME value is used across
+# every strategy -- "same reasoning effort across conditions" holds by
+# construction.
+reasoning_effort = "low"
+
+# Generous enough that a short, strictly-formatted answer is never
+# truncated by its own reasoning overhead (same rationale as lab02/
+# lab03/lab04's own max_completion_tokens defaults); finish_reason="length"
+# is still recorded on every call so truncation stays visible if it happens.
+max_completion_tokens = 1024
+
+# At this small a scale (8-18 calls), randomizing task order buys little
+# bias-reduction on its own -- the paired/interleaved execution order
+# itself (see labs.lab05_model_routing.matrix) is what actually spreads
+# any time-dependent provider effects across strategies. Off by default,
+# but fully supported.
+randomize_task_order = false
+randomization_seed = 42
+
+# Request-count safety net: exactly this project's documented Extended
+# Experiment ceiling (6 tasks x 3 strategies = 18 calls) -- the largest
+# planned scope documented for this lab. A --profile override that would
+# push the plan above this is refused before any API call.
+max_api_calls = 18
+
+# Cost safety net, derived from this file's own [pricing] and
+# max_completion_tokens above: worst case at the 18-call extended ceiling
+# is 18 x 1024 x $0.60/1e6 (gpt-oss-120b output price) = $0.011, plus a
+# negligible prompt-token share. $0.05 leaves generous headroom while
+# still being a real, enforced cap.
+max_estimated_cost_usd = 0.05
+
 [lab03]
 # Prompt caching is only supported on these Groq models today (Oct 2026).
 caching_capable_models = ["openai/gpt-oss-20b", "openai/gpt-oss-120b"]
@@ -134,6 +177,183 @@ cache_probe_calls = 3
 
 [lab09]
 batch_completion_window = "24h"
+
+[lab08]
+# Lab08's sequential-vs-concurrent async execution experiment. Entirely
+# optional (see lab_core.config._build_lab08): a config file that omits
+# [lab08] entirely gets exactly these defaults, matching this project's
+# documented default experiment matrix: 8 tasks x 2 concurrency levels
+# (1, 5) = 16 planned calls.
+enabled = true
+model = "openai/gpt-oss-20b"
+
+# "pilot" (4 tasks x [1, 3] = 8 calls) / "default" (8 tasks x
+# concurrency_levels below = 16 calls) / "extended" (8 tasks x
+# [1, 2, 3, 5] = 32 calls). Only "default"'s concurrency_levels are
+# configurable (pilot/extended are fixed, documented scopes). Override
+# with --profile.
+default_profile = "default"
+concurrency_levels = [1, 5]
+repetitions = 1
+
+# openai/gpt-oss-20b/120b only support these three reasoning_effort
+# levels (see SUPPORTED_REASONING_EFFORTS above). The SAME value is used
+# across every concurrency level.
+reasoning_effort = "low"
+
+# Generous enough for a short, strictly-formatted numeric answer to never
+# be truncated by its own reasoning overhead; finish_reason="length" is
+# still recorded on every call so truncation stays visible if it happens.
+max_completion_tokens = 256
+
+# At this small a scale, randomizing repeated-batch order buys little
+# bias-reduction on its own -- the default execution order already
+# alternates which concurrency level runs first every other repetition
+# (see labs.lab08_concurrency.matrix). Off by default, but fully
+# supported.
+randomize_condition_order = false
+randomization_seed = 42
+
+# A hard ceiling on any single concurrency level (config value or
+# --max-concurrent override) -- rejected before any live call, not just
+# a soft default.
+max_allowed_concurrency = 10
+
+# This lab's OWN AsyncGroq client is constructed with max_retries=0 so
+# the SDK's own hidden automatic retries (installed groq==1.7.0's
+# DEFAULT_MAX_RETRIES=2, verified by reading groq/_constants.py) never
+# inflate measured latency or attempt counts. Never applied to any other
+# lab's shared client.
+sdk_max_retries = 0
+
+# Request-count safety net: exactly this project's documented Extended
+# Experiment ceiling (8 tasks x 4 concurrency levels = 32 calls) -- the
+# largest planned scope documented for this lab. A --profile override
+# that would push the plan above this is refused before any API call.
+max_api_calls = 32
+
+# Cost safety net, derived from this file's own [pricing] and
+# max_completion_tokens above: worst case at the 32-call extended
+# ceiling is 32 x 256 x $0.30/1e6 (gpt-oss-20b output price) = $0.00246,
+# plus a negligible prompt-token share. $0.05 leaves generous headroom
+# while still being a real, enforced cap.
+max_estimated_cost_usd = 0.05
+
+[lab07]
+# Lab07's fully offline retry-strategy/rate-limiting simulation. Entirely
+# optional (see lab_core.config._build_lab07): a config file that omits
+# [lab07] entirely gets exactly these defaults, matching this project's
+# documented default matrix: 3 scenarios x 4 strategies = 12 planned
+# simulation runs. Deliberately DECOUPLED from the global [retry] section
+# above (which governs real operational retries for LAB01-06's live API
+# calls) -- these fields are Lab07's own experiment variable.
+enabled = true
+default_profile = "default"
+randomization_seed = 42
+
+# Simulation workload ceilings -- not an API-call budget (this lab makes
+# zero real API calls), but a safety net against an unbounded discrete-
+# event simulation.
+max_simulation_events = 10000
+max_clients = 50
+
+# Lab07's own simulated retry policy knobs (see the module docstring on
+# Lab07Config for why these are intentionally separate from [retry]).
+max_attempts = 5
+base_delay_seconds = 1.0
+max_delay_seconds = 30.0
+max_total_wait_seconds = 120.0
+# simulation_deadline_seconds is left unset (no deadline) by default.
+
+# Scenario 1 (Fixed Transient Failures): the server rejects a single
+# client's first N attempts unconditionally, then succeeds -- matches
+# this project's pre-redesign default (2 simulated 429s then success).
+transient_fail_count = 2
+
+# Scenario 2 (Server Recovery Window): the server rejects EVERY attempt
+# (any client) before virtual time 3.0s. At the defaults above,
+# no_backoff exhausts its 5-attempt budget at virtual time 0 (never
+# reaching recovery), while exponential_backoff's cumulative delay
+# (1+2=3.0s before attempt 3) lands exactly at the recovery boundary --
+# this is a real, computed consequence of these numbers, not scripted.
+recovery_time_seconds = 3.0
+
+# Scenario 3 (Shared Contention / Thundering Herd): 8 simulated clients
+# share a capacity of 2 accepted requests per 1-second virtual window.
+contention_client_count = 8
+contention_capacity_per_window = 2
+contention_window_seconds = 1.0
+
+# Scenario 5 (Request/Token Quota Pressure, extended profile only): 3
+# simulated clients share an RPM-style request cap and a TPM-style token
+# cap per 60-second virtual window. `quota_token_demand_per_request` is a
+# controlled, documented simulation parameter -- NOT a real Groq token
+# count for any model.
+quota_client_count = 3
+quota_rpm = 5
+quota_tpm = 250
+quota_token_demand_per_request = 100
+quota_window_seconds = 60.0
+
+[lab06]
+# Lab06's streaming/non-streaming perceived-latency experiment. Entirely
+# optional (see lab_core.config._build_lab06): a config file that omits
+# [lab06] entirely gets exactly these defaults, matching this project's
+# documented default experiment matrix: 5 paired repetitions x 2
+# conditions (non_streaming, streaming) = 10 planned calls.
+enabled = true
+model = "openai/gpt-oss-20b"
+
+# "pilot" (2 pairs = 4 calls) / "default" (5 pairs = 10 calls) / "extended"
+# (8 pairs = 16 calls). Only "default"'s pair count is configurable below
+# (pilot/extended are fixed, documented scopes). Override with --profile.
+default_profile = "default"
+paired_repetitions = 5
+
+# openai/gpt-oss-20b/120b only support these three reasoning_effort levels
+# (see SUPPORTED_REASONING_EFFORTS above). The SAME value is used for both
+# the streaming and non-streaming condition in every pair.
+reasoning_effort = "low"
+
+# Large enough to comfortably fit the Production API Incident Explanation
+# task's 5 required sections (recommended ~120-180 words) with reasoning
+# overhead included; finish_reason="length" is still recorded on every
+# call so truncation stays visible if it happens.
+max_completion_tokens = 768
+
+# At this small a scale (4-16 calls), the default execution order already
+# alternates which condition goes first every other pair (see
+# labs.lab06_streaming.matrix) -- seeded randomization is an alternative,
+# off by default, but fully supported.
+randomize_condition_order = false
+randomization_seed = 42
+
+# Whether to request streaming token usage via extra_body=
+# {"stream_options": {"include_usage": true}} -- verified supported by the
+# installed groq SDK (groq==1.7.0, see ChatCompletionChunk.usage's own
+# docstring) and documented as a real Groq API feature, not a guess. The
+# provider is still never guaranteed to populate it; when it doesn't,
+# usage_status stays "USAGE_UNAVAILABLE" rather than fabricating a value.
+request_usage_when_supported = true
+
+# Whether to persist the per-chunk event timeline (bounded, safe metadata
+# only -- event type, arrival time, character counts -- never prompt or
+# reasoning text) to stream_events.csv for the streaming-content-arrival
+# chart.
+record_event_timeline = true
+
+# Request-count safety net: exactly this project's documented Extended
+# Experiment ceiling (8 pairs x 2 conditions = 16 calls) -- the largest
+# planned scope documented for this lab. A --profile override that would
+# push the plan above this is refused before any API call.
+max_api_calls = 16
+
+# Cost safety net, derived from this file's own [pricing] and
+# max_completion_tokens above: worst case at the 16-call extended ceiling
+# is 16 x 768 x $0.30/1e6 (gpt-oss-20b output price) = $0.00369, plus a
+# negligible prompt-token share. $0.05 leaves generous headroom while
+# still being a real, enforced cap.
+max_estimated_cost_usd = 0.05
 
 [lab04]
 # Lab04's output-control/invocation-optimization experiment. Entirely

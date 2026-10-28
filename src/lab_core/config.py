@@ -55,8 +55,24 @@ class ModelPricing:
 
 @dataclass(frozen=True)
 class Lab05Config:
+    """Lab05's model-routing experiment.
+
+    `small_model`/`large_model` remain required (unchanged from before this
+    redesign). The new fields below are optional with documented defaults
+    matching this project's default 12-call experiment (6 tasks x 2
+    strategies): a config that predates this redesign and only ever set
+    small_model/large_model keeps working identically.
+    """
+
     small_model: str
     large_model: str
+    default_profile: str
+    reasoning_effort: str
+    max_completion_tokens: int
+    randomize_task_order: bool
+    randomization_seed: int
+    max_api_calls: Optional[int]
+    max_estimated_cost_usd: Optional[float]
 
 
 @dataclass(frozen=True)
@@ -101,6 +117,102 @@ class Lab04Config:
     reasoning_effort: str
     invocation_max_completion_tokens: int
     invocation_execution_mode: str
+    max_api_calls: Optional[int]
+    max_estimated_cost_usd: Optional[float]
+
+
+@dataclass(frozen=True)
+class Lab06Config:
+    """Lab06's streaming/non-streaming perceived-latency experiment.
+
+    Entirely optional at the AppConfig level (same pattern as
+    Lab02Config/Lab04Config): `lab06 all --live` must keep working with
+    its documented 10-call default (5 paired repetitions x 2 conditions)
+    even for a config that predates this section.
+    """
+
+    enabled: bool
+    model: str
+    default_profile: str
+    paired_repetitions: int
+    reasoning_effort: str
+    max_completion_tokens: int
+    randomize_condition_order: bool
+    randomization_seed: int
+    request_usage_when_supported: bool
+    record_event_timeline: bool
+    max_api_calls: Optional[int]
+    max_estimated_cost_usd: Optional[float]
+
+
+@dataclass(frozen=True)
+class Lab07Config:
+    """Lab07's fully offline retry-strategy/rate-limiting simulation.
+
+    Entirely optional at the AppConfig level (same pattern as
+    Lab02Config/Lab04Config/Lab06Config): `lab07 all --config
+    config/default.toml` must keep working with its documented 12-run
+    default (3 scenarios x 4 strategies) even for a config that predates
+    this section. Deliberately decoupled from the global `[retry]`
+    section (used by every live-API lab for REAL operational resilience)
+    -- Lab07's own retry-shaped fields here are a SIMULATION parameter
+    (this lab's explicit experiment variable), not an operational concern,
+    so changing one can never silently change the other.
+    """
+
+    enabled: bool
+    default_profile: str
+    randomization_seed: int
+    max_simulation_events: int
+    max_clients: int
+    max_attempts: int
+    base_delay_seconds: float
+    max_delay_seconds: float
+    max_total_wait_seconds: Optional[float]
+    simulation_deadline_seconds: Optional[float]
+    transient_fail_count: int
+    recovery_time_seconds: float
+    contention_client_count: int
+    contention_capacity_per_window: int
+    contention_window_seconds: float
+    quota_client_count: int
+    quota_rpm: int
+    quota_tpm: int
+    quota_token_demand_per_request: int
+    quota_window_seconds: float
+
+
+@dataclass(frozen=True)
+class Lab08Config:
+    """Lab08's sequential-vs-concurrent async execution experiment.
+
+    Entirely optional at the AppConfig level (same pattern as
+    Lab02Config/Lab04Config/Lab06Config/Lab07Config): `lab08 all --live`
+    must keep working with its documented 16-call default (8 tasks x 2
+    concurrency levels) even for a config that predates this section.
+    """
+
+    enabled: bool
+    model: str
+    default_profile: str
+    # Configures only the "default" profile's concurrency levels (pilot=
+    # (1, 3), extended=(1, 2, 3, 5) are fixed, documented scopes -- same
+    # precedent as Lab06Config.paired_repetitions/Lab07Config.default_profile).
+    concurrency_levels: tuple[int, ...]
+    repetitions: int
+    reasoning_effort: str
+    max_completion_tokens: int
+    randomize_condition_order: bool
+    randomization_seed: int
+    # A hard ceiling on any single concurrency level (default-profile
+    # config value or --max-concurrent CLI override) -- enforced before
+    # any live call, independent of the API-call budget below.
+    max_allowed_concurrency: int
+    # This lab's OWN AsyncGroq client is constructed with this
+    # max_retries value (default 0) so the SDK's hidden automatic retries
+    # never inflate measured latency/attempt counts -- never applied to
+    # any other lab's shared client.
+    sdk_max_retries: int
     max_api_calls: Optional[int]
     max_estimated_cost_usd: Optional[float]
 
@@ -208,6 +320,9 @@ class AppConfig:
     lab03: Lab03Config
     lab04: Lab04Config
     lab05: Lab05Config
+    lab06: Lab06Config
+    lab07: Lab07Config
+    lab08: Lab08Config
     lab09: Lab09Config
     lab01_factorial: Optional[Lab01FactorialConfig]
     lab01_effort: Optional[Lab01EffortConfig]
@@ -610,11 +725,433 @@ def _build_lab04(raw: dict) -> Lab04Config:
     )
 
 
+LAB05_PROFILES = ("pilot", "default", "extended")
+
+
 def _build_lab05(raw: dict) -> Lab05Config:
     section = raw.get("lab05", {})
+    small_model = str(_require(section, "small_model", "lab05"))
+    large_model = str(_require(section, "large_model", "lab05"))
+
+    default_profile = section.get("default_profile", "default")
+    if default_profile not in LAB05_PROFILES:
+        raise ConfigError(f"lab05.default_profile must be one of {LAB05_PROFILES}")
+
+    reasoning_effort = section.get("reasoning_effort", "low")
+    if reasoning_effort not in SUPPORTED_REASONING_EFFORTS:
+        raise ConfigError(
+            f"lab05.reasoning_effort: unsupported value '{reasoning_effort}' -- "
+            f"this project's models only support {SUPPORTED_REASONING_EFFORTS}"
+        )
+
+    max_completion_tokens = section.get("max_completion_tokens", 1024)
+    if (
+        isinstance(max_completion_tokens, bool)
+        or not isinstance(max_completion_tokens, int)
+        or max_completion_tokens < 1
+    ):
+        raise ConfigError("lab05.max_completion_tokens must be a positive integer")
+
+    randomize_task_order = section.get("randomize_task_order", False)
+    if not isinstance(randomize_task_order, bool):
+        raise ConfigError("lab05.randomize_task_order must be a boolean")
+
+    randomization_seed = section.get("randomization_seed", 42)
+    if isinstance(randomization_seed, bool) or not isinstance(randomization_seed, int):
+        raise ConfigError("lab05.randomization_seed must be an integer")
+
+    # Exactly this project's documented Extended Experiment ceiling (6
+    # tasks x 3 strategies = 18 calls) -- the largest planned scope
+    # documented for this lab. A --profile override that would push the
+    # plan above this is refused before any API call.
+    max_api_calls = section.get("max_api_calls", 18)
+    if max_api_calls is not None:
+        if isinstance(max_api_calls, bool) or not isinstance(max_api_calls, int) or max_api_calls < 1:
+            raise ConfigError("lab05.max_api_calls must be a positive integer or omitted")
+
+    # Worst case at the 18-call extended ceiling: 18 x 1024
+    # max_completion_tokens x $0.60/1e6 (gpt-oss-120b output price) =
+    # $0.011, plus a negligible prompt-token share. $0.05 leaves generous
+    # headroom while still being a real, enforced cap.
+    max_estimated_cost_usd = section.get("max_estimated_cost_usd", 0.05)
+    if max_estimated_cost_usd is not None:
+        if (
+            isinstance(max_estimated_cost_usd, bool)
+            or not isinstance(max_estimated_cost_usd, (int, float))
+            or max_estimated_cost_usd <= 0
+        ):
+            raise ConfigError("lab05.max_estimated_cost_usd must be a positive number or omitted")
+        max_estimated_cost_usd = float(max_estimated_cost_usd)
+
+    known_keys = {
+        "small_model",
+        "large_model",
+        "default_profile",
+        "reasoning_effort",
+        "max_completion_tokens",
+        "randomize_task_order",
+        "randomization_seed",
+        "max_api_calls",
+        "max_estimated_cost_usd",
+    }
+    unknown_keys = set(section.keys()) - known_keys
+    if unknown_keys:
+        raise ConfigError(f"lab05 has unknown configuration key(s): {sorted(unknown_keys)}")
+
     return Lab05Config(
-        small_model=str(_require(section, "small_model", "lab05")),
-        large_model=str(_require(section, "large_model", "lab05")),
+        small_model=small_model,
+        large_model=large_model,
+        default_profile=default_profile,
+        reasoning_effort=reasoning_effort,
+        max_completion_tokens=max_completion_tokens,
+        randomize_task_order=randomize_task_order,
+        randomization_seed=randomization_seed,
+        max_api_calls=max_api_calls,
+        max_estimated_cost_usd=max_estimated_cost_usd,
+    )
+
+
+LAB06_PROFILES = ("pilot", "default", "extended")
+
+
+def _build_lab06(raw: dict) -> Lab06Config:
+    """Optional [lab06] section with safe, documented defaults: 5 paired
+    repetitions x 2 conditions (non_streaming, streaming) = 10 planned
+    calls by default, matching this project's documented default
+    experiment matrix. A config file that omits [lab06] entirely gets
+    exactly these defaults.
+    """
+    section = raw.get("lab06", {})
+
+    enabled = section.get("enabled", True)
+    if not isinstance(enabled, bool):
+        raise ConfigError("lab06.enabled must be a boolean")
+
+    model = str(section.get("model", "openai/gpt-oss-20b"))
+
+    default_profile = section.get("default_profile", "default")
+    if default_profile not in LAB06_PROFILES:
+        raise ConfigError(f"lab06.default_profile must be one of {LAB06_PROFILES}")
+
+    # Only the "default" profile's pair count is configurable -- "pilot"
+    # (2 pairs) and "extended" (8 pairs) are fixed, documented scopes (see
+    # labs.lab06_streaming.matrix.PROFILE_PAIRS).
+    paired_repetitions = section.get("paired_repetitions", 5)
+    if isinstance(paired_repetitions, bool) or not isinstance(paired_repetitions, int) or paired_repetitions < 1:
+        raise ConfigError("lab06.paired_repetitions must be a positive integer")
+
+    reasoning_effort = section.get("reasoning_effort", "low")
+    if reasoning_effort not in SUPPORTED_REASONING_EFFORTS:
+        raise ConfigError(
+            f"lab06.reasoning_effort: unsupported value '{reasoning_effort}' -- "
+            f"this project's models only support {SUPPORTED_REASONING_EFFORTS}"
+        )
+
+    max_completion_tokens = section.get("max_completion_tokens", 768)
+    if (
+        isinstance(max_completion_tokens, bool)
+        or not isinstance(max_completion_tokens, int)
+        or max_completion_tokens < 1
+    ):
+        raise ConfigError("lab06.max_completion_tokens must be a positive integer")
+
+    randomize_condition_order = section.get("randomize_condition_order", False)
+    if not isinstance(randomize_condition_order, bool):
+        raise ConfigError("lab06.randomize_condition_order must be a boolean")
+
+    randomization_seed = section.get("randomization_seed", 42)
+    if isinstance(randomization_seed, bool) or not isinstance(randomization_seed, int):
+        raise ConfigError("lab06.randomization_seed must be an integer")
+
+    request_usage_when_supported = section.get("request_usage_when_supported", True)
+    if not isinstance(request_usage_when_supported, bool):
+        raise ConfigError("lab06.request_usage_when_supported must be a boolean")
+
+    record_event_timeline = section.get("record_event_timeline", True)
+    if not isinstance(record_event_timeline, bool):
+        raise ConfigError("lab06.record_event_timeline must be a boolean")
+
+    # Exactly this project's documented Extended Experiment ceiling (8
+    # pairs x 2 conditions = 16 calls) -- the largest planned scope
+    # documented for this lab. A --profile override that would push the
+    # plan above this is refused before any API call.
+    max_api_calls = section.get("max_api_calls", 16)
+    if max_api_calls is not None:
+        if isinstance(max_api_calls, bool) or not isinstance(max_api_calls, int) or max_api_calls < 1:
+            raise ConfigError("lab06.max_api_calls must be a positive integer or omitted")
+
+    # Worst case at the 16-call extended ceiling: 16 x 768
+    # max_completion_tokens x $0.30/1e6 (gpt-oss-20b output price) =
+    # $0.00369, plus a negligible prompt-token share. $0.05 leaves
+    # generous headroom while still being a real, enforced cap.
+    max_estimated_cost_usd = section.get("max_estimated_cost_usd", 0.05)
+    if max_estimated_cost_usd is not None:
+        if (
+            isinstance(max_estimated_cost_usd, bool)
+            or not isinstance(max_estimated_cost_usd, (int, float))
+            or max_estimated_cost_usd <= 0
+        ):
+            raise ConfigError("lab06.max_estimated_cost_usd must be a positive number or omitted")
+        max_estimated_cost_usd = float(max_estimated_cost_usd)
+
+    known_keys = {
+        "enabled",
+        "model",
+        "default_profile",
+        "paired_repetitions",
+        "reasoning_effort",
+        "max_completion_tokens",
+        "randomize_condition_order",
+        "randomization_seed",
+        "request_usage_when_supported",
+        "record_event_timeline",
+        "max_api_calls",
+        "max_estimated_cost_usd",
+    }
+    unknown_keys = set(section.keys()) - known_keys
+    if unknown_keys:
+        raise ConfigError(f"lab06 has unknown configuration key(s): {sorted(unknown_keys)}")
+
+    return Lab06Config(
+        enabled=enabled,
+        model=model,
+        default_profile=default_profile,
+        paired_repetitions=paired_repetitions,
+        reasoning_effort=reasoning_effort,
+        max_completion_tokens=max_completion_tokens,
+        randomize_condition_order=randomize_condition_order,
+        randomization_seed=randomization_seed,
+        request_usage_when_supported=request_usage_when_supported,
+        record_event_timeline=record_event_timeline,
+        max_api_calls=max_api_calls,
+        max_estimated_cost_usd=max_estimated_cost_usd,
+    )
+
+
+LAB07_PROFILES = ("pilot", "default", "extended")
+
+
+def _build_lab07(raw: dict) -> Lab07Config:
+    """Optional [lab07] section with safe, documented defaults: 3
+    scenarios x 4 strategies = 12 planned simulation runs by default
+    (this project's documented default matrix). A config file that omits
+    [lab07] entirely gets exactly these defaults.
+    """
+    section = raw.get("lab07", {})
+
+    enabled = section.get("enabled", True)
+    if not isinstance(enabled, bool):
+        raise ConfigError("lab07.enabled must be a boolean")
+
+    default_profile = section.get("default_profile", "default")
+    if default_profile not in LAB07_PROFILES:
+        raise ConfigError(f"lab07.default_profile must be one of {LAB07_PROFILES}")
+
+    def _positive_int(key: str, default: int) -> int:
+        value = section.get(key, default)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise ConfigError(f"lab07.{key} must be a positive integer")
+        return value
+
+    def _non_negative_int(key: str, default: int) -> int:
+        value = section.get(key, default)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ConfigError(f"lab07.{key} must be a non-negative integer")
+        return value
+
+    def _positive_float(key: str, default: float) -> float:
+        value = section.get(key, default)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+            raise ConfigError(f"lab07.{key} must be a positive number")
+        return float(value)
+
+    def _optional_positive_float(key: str, default: Optional[float]) -> Optional[float]:
+        value = section.get(key, default)
+        if value is None:
+            return None
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+            raise ConfigError(f"lab07.{key} must be a positive number or omitted")
+        return float(value)
+
+    randomization_seed = section.get("randomization_seed", 42)
+    if isinstance(randomization_seed, bool) or not isinstance(randomization_seed, int):
+        raise ConfigError("lab07.randomization_seed must be an integer")
+
+    max_simulation_events = _positive_int("max_simulation_events", 10_000)
+    max_clients = _positive_int("max_clients", 50)
+    max_attempts = _positive_int("max_attempts", 5)
+    base_delay_seconds = _positive_float("base_delay_seconds", 1.0)
+    max_delay_seconds = _positive_float("max_delay_seconds", 30.0)
+    if max_delay_seconds < base_delay_seconds:
+        raise ConfigError("lab07.max_delay_seconds must be >= lab07.base_delay_seconds")
+    max_total_wait_seconds = _optional_positive_float("max_total_wait_seconds", 120.0)
+    simulation_deadline_seconds = _optional_positive_float("simulation_deadline_seconds", None)
+
+    transient_fail_count = _non_negative_int("transient_fail_count", 2)
+    recovery_time_seconds = _positive_float("recovery_time_seconds", 3.0)
+
+    contention_client_count = _positive_int("contention_client_count", 8)
+    contention_capacity_per_window = _positive_int("contention_capacity_per_window", 2)
+    contention_window_seconds = _positive_float("contention_window_seconds", 1.0)
+
+    quota_client_count = _positive_int("quota_client_count", 3)
+    quota_rpm = _positive_int("quota_rpm", 5)
+    quota_tpm = _positive_int("quota_tpm", 250)
+    quota_token_demand_per_request = _positive_int("quota_token_demand_per_request", 100)
+    quota_window_seconds = _positive_float("quota_window_seconds", 60.0)
+
+    if contention_client_count > max_clients:
+        raise ConfigError("lab07.contention_client_count must not exceed lab07.max_clients")
+    if quota_client_count > max_clients:
+        raise ConfigError("lab07.quota_client_count must not exceed lab07.max_clients")
+
+    known_keys = {
+        "enabled", "default_profile", "randomization_seed", "max_simulation_events", "max_clients",
+        "max_attempts", "base_delay_seconds", "max_delay_seconds", "max_total_wait_seconds",
+        "simulation_deadline_seconds", "transient_fail_count", "recovery_time_seconds",
+        "contention_client_count", "contention_capacity_per_window", "contention_window_seconds",
+        "quota_client_count", "quota_rpm", "quota_tpm", "quota_token_demand_per_request", "quota_window_seconds",
+    }
+    unknown_keys = set(section.keys()) - known_keys
+    if unknown_keys:
+        raise ConfigError(f"lab07 has unknown configuration key(s): {sorted(unknown_keys)}")
+
+    return Lab07Config(
+        enabled=enabled,
+        default_profile=default_profile,
+        randomization_seed=randomization_seed,
+        max_simulation_events=max_simulation_events,
+        max_clients=max_clients,
+        max_attempts=max_attempts,
+        base_delay_seconds=base_delay_seconds,
+        max_delay_seconds=max_delay_seconds,
+        max_total_wait_seconds=max_total_wait_seconds,
+        simulation_deadline_seconds=simulation_deadline_seconds,
+        transient_fail_count=transient_fail_count,
+        recovery_time_seconds=recovery_time_seconds,
+        contention_client_count=contention_client_count,
+        contention_capacity_per_window=contention_capacity_per_window,
+        contention_window_seconds=contention_window_seconds,
+        quota_client_count=quota_client_count,
+        quota_rpm=quota_rpm,
+        quota_tpm=quota_tpm,
+        quota_token_demand_per_request=quota_token_demand_per_request,
+        quota_window_seconds=quota_window_seconds,
+    )
+
+
+LAB08_PROFILES = ("pilot", "default", "extended")
+
+
+def _build_lab08(raw: dict) -> Lab08Config:
+    """Optional [lab08] section with safe, documented defaults: 8 tasks x
+    2 concurrency levels (1, 5) = 16 planned calls by default, matching
+    this project's documented default experiment matrix. A config file
+    that omits [lab08] entirely gets exactly these defaults.
+    """
+    section = raw.get("lab08", {})
+
+    enabled = section.get("enabled", True)
+    if not isinstance(enabled, bool):
+        raise ConfigError("lab08.enabled must be a boolean")
+
+    model = str(section.get("model", "openai/gpt-oss-20b"))
+
+    default_profile = section.get("default_profile", "default")
+    if default_profile not in LAB08_PROFILES:
+        raise ConfigError(f"lab08.default_profile must be one of {LAB08_PROFILES}")
+
+    concurrency_levels = _validate_positive_int_list(
+        section.get("concurrency_levels", [1, 5]), "lab08.concurrency_levels"
+    )
+
+    repetitions = section.get("repetitions", 1)
+    if isinstance(repetitions, bool) or not isinstance(repetitions, int) or repetitions < 1:
+        raise ConfigError("lab08.repetitions must be a positive integer")
+
+    reasoning_effort = section.get("reasoning_effort", "low")
+    if reasoning_effort not in SUPPORTED_REASONING_EFFORTS:
+        raise ConfigError(
+            f"lab08.reasoning_effort: unsupported value '{reasoning_effort}' -- "
+            f"this project's models only support {SUPPORTED_REASONING_EFFORTS}"
+        )
+
+    max_completion_tokens = section.get("max_completion_tokens", 256)
+    if (
+        isinstance(max_completion_tokens, bool)
+        or not isinstance(max_completion_tokens, int)
+        or max_completion_tokens < 1
+    ):
+        raise ConfigError("lab08.max_completion_tokens must be a positive integer")
+
+    randomize_condition_order = section.get("randomize_condition_order", False)
+    if not isinstance(randomize_condition_order, bool):
+        raise ConfigError("lab08.randomize_condition_order must be a boolean")
+
+    randomization_seed = section.get("randomization_seed", 42)
+    if isinstance(randomization_seed, bool) or not isinstance(randomization_seed, int):
+        raise ConfigError("lab08.randomization_seed must be an integer")
+
+    max_allowed_concurrency = section.get("max_allowed_concurrency", 10)
+    if (
+        isinstance(max_allowed_concurrency, bool)
+        or not isinstance(max_allowed_concurrency, int)
+        or max_allowed_concurrency < 1
+    ):
+        raise ConfigError("lab08.max_allowed_concurrency must be a positive integer")
+    if max(concurrency_levels) > max_allowed_concurrency:
+        raise ConfigError("lab08.concurrency_levels must not exceed lab08.max_allowed_concurrency")
+
+    sdk_max_retries = section.get("sdk_max_retries", 0)
+    if isinstance(sdk_max_retries, bool) or not isinstance(sdk_max_retries, int) or sdk_max_retries < 0:
+        raise ConfigError("lab08.sdk_max_retries must be a non-negative integer")
+
+    # Exactly this project's documented Extended Experiment ceiling (8
+    # tasks x 4 concurrency levels = 32 calls) -- the largest planned
+    # scope documented for this lab. A --profile override that would push
+    # the plan above this is refused before any API call.
+    max_api_calls = section.get("max_api_calls", 32)
+    if max_api_calls is not None:
+        if isinstance(max_api_calls, bool) or not isinstance(max_api_calls, int) or max_api_calls < 1:
+            raise ConfigError("lab08.max_api_calls must be a positive integer or omitted")
+
+    # Worst case at the 32-call extended ceiling: 32 x 256
+    # max_completion_tokens x $0.30/1e6 (gpt-oss-20b output price) =
+    # $0.00246, plus a negligible prompt-token share. $0.05 leaves
+    # generous headroom while still being a real, enforced cap.
+    max_estimated_cost_usd = section.get("max_estimated_cost_usd", 0.05)
+    if max_estimated_cost_usd is not None:
+        if (
+            isinstance(max_estimated_cost_usd, bool)
+            or not isinstance(max_estimated_cost_usd, (int, float))
+            or max_estimated_cost_usd <= 0
+        ):
+            raise ConfigError("lab08.max_estimated_cost_usd must be a positive number or omitted")
+        max_estimated_cost_usd = float(max_estimated_cost_usd)
+
+    known_keys = {
+        "enabled", "model", "default_profile", "concurrency_levels", "repetitions", "reasoning_effort",
+        "max_completion_tokens", "randomize_condition_order", "randomization_seed", "max_allowed_concurrency",
+        "sdk_max_retries", "max_api_calls", "max_estimated_cost_usd",
+    }
+    unknown_keys = set(section.keys()) - known_keys
+    if unknown_keys:
+        raise ConfigError(f"lab08 has unknown configuration key(s): {sorted(unknown_keys)}")
+
+    return Lab08Config(
+        enabled=enabled,
+        model=model,
+        default_profile=default_profile,
+        concurrency_levels=tuple(concurrency_levels),
+        repetitions=repetitions,
+        reasoning_effort=reasoning_effort,
+        max_completion_tokens=max_completion_tokens,
+        randomize_condition_order=randomize_condition_order,
+        randomization_seed=randomization_seed,
+        max_allowed_concurrency=max_allowed_concurrency,
+        sdk_max_retries=sdk_max_retries,
+        max_api_calls=max_api_calls,
+        max_estimated_cost_usd=max_estimated_cost_usd,
     )
 
 
@@ -893,6 +1430,9 @@ def load_config(path: Path | None = None) -> AppConfig:
         lab03=_build_lab03(raw),
         lab04=_build_lab04(raw),
         lab05=_build_lab05(raw),
+        lab06=_build_lab06(raw),
+        lab07=_build_lab07(raw),
+        lab08=_build_lab08(raw),
         lab09=_build_lab09(raw),
         lab01_factorial=_build_lab01_factorial(raw),
         lab01_effort=_build_lab01_effort(raw),

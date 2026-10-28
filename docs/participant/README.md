@@ -397,50 +397,145 @@ accepted too.
 
 ## Lab05 -- Model Routing
 
-**Objective:** compare a fixed-model baseline against a simple rule-based
-router that sends short/simple prompts to a small model and
-longer/keyword-flagged prompts to a large model, over a small golden
-dataset with deterministic pass/fail checks.
+**Objective:** measure how model-routing decisions affect answer quality,
+token consumption, estimated cost and latency -- comparing an
+Always-Small baseline, an optional Always-Large baseline, and a
+deterministic, explainable, rule-based router, over a 13-task golden
+dataset with 6 different deterministic evaluator types (no substring-only
+checks, no LLM judge).
 
 ```
+# Preview the plan (12 calls by default: 6 tasks x 2 strategies) --
+# shows every routing decision OFFLINE (zero API calls), never calls the
+# API, needs no API key:
+uv run lab-cli lab05 all --dry-run --config config/default.toml
+
+# Real execution:
 uv run lab-cli lab05 all --live --config config/live.toml
+
+# Extended profile (adds the Always-Large baseline -- 18 calls):
+uv run lab-cli lab05 all --live --profile extended --config config/live.toml
+
+# Single-strategy commands (backward compatible):
+uv run lab-cli lab05 fixed_model_baseline --live --config config/live.toml
+uv run lab-cli lab05 rule_based_routing --live --config config/live.toml
+uv run lab-cli lab05 always_large --live --config config/live.toml
+
+# Regenerate charts for every completed run (and the legacy flat-file
+# backfill), offline, no API key:
+uv run lab-cli lab05 backfill --config config/default.toml
 ```
 
-Compare the two `summary` lines printed (accuracy / cost / latency).
-The routing heuristic is intentionally simple (prompt length + a keyword
-list) and is not guaranteed to generalize beyond this dataset -- that
-limitation is itself worth discussing.
+Results land in `results/lab05_model_routing/<run_id>/`: measurements
+(`routing_measurements.json/csv`), per-task baseline-vs-routed comparisons
+(`task_comparison.csv`), per-strategy summaries (`strategy_summary.csv`),
+a Markdown `analysis_report.md`, and 9 PNG charts under `charts/`.
+
+The router reads ONLY each task's prompt text -- never the dataset's
+ground-truth `complexity_label`, never the expected answer. Compare the
+printed `-- Model Routing Comparison --` block: `Quality Delta`/task-level
+`quality_outcome` (`QUALITY_PRESERVED` / `ROUTING_QUALITY_REGRESSION` /
+`ROUTING_QUALITY_IMPROVEMENT` / `BOTH_FAILED`) is always reported
+separately from cost, so a cheaper routing result is never presented as
+"better" if it also got an answer wrong. If routing turns out to be MORE
+expensive than the Always-Small baseline, that is reported honestly as a
+"Routing Cost Increase" -- not hidden.
 
 ## Lab06 -- Streaming & Perceived Latency
 
-**Objective:** distinguish time-to-first-token (TTFT) from
-time-to-first-*visible*-content, and compare streaming vs non-streaming
-total latency and throughput.
+**Objective:** distinguish `first_stream_event_ms` (the first SSE packet)
+from `first_visible_content_ms` (the first chunk that actually carries
+displayable text) from total latency -- and measure whether streaming's
+real benefit (showing useful content to the user earlier) actually shows
+up in a paired, controlled comparison against a non-streaming call.
 
 ```
+# Preview the plan (10 calls by default: 5 paired repetitions x 2
+# conditions) -- never calls the API, needs no API key:
+uv run lab-cli lab06 all --dry-run --config config/default.toml
+
+# Real execution:
 uv run lab-cli lab06 all --live --config config/live.toml
+
+# Single-condition commands (backward compatible):
+uv run lab-cli lab06 non_streaming --live --config config/live.toml
+uv run lab-cli lab06 streaming --live --config config/live.toml
+
+# Extended profile (8 pairs = 16 calls):
+uv run lab-cli lab06 all --live --profile extended --config config/live.toml
+
+# Regenerate charts for every completed run (and the legacy flat-file
+# backfill), offline, no API key:
+uv run lab-cli lab06 backfill --config config/default.toml
 ```
 
-`ttft_ms` marks the first network chunk; `first_visible_content_ms` marks
-the first chunk that actually carries visible text -- these can differ if
-the first chunk only carries role metadata. Token usage is intentionally
-not reported for the streaming condition (Groq's streaming usage support
-was not confirmed during this project's research); `output_tokens_per_second`
-instead comes from the separate non-streaming call.
+Results land in `results/lab06_streaming/<run_id>/`: measurements
+(`stream_measurements.json/csv`), the per-chunk event timeline
+(`stream_events.csv` -- bounded metadata only, never prompt/reasoning
+text), paired comparisons (`paired_comparison.csv`), per-condition
+summaries (`condition_summary.csv`), a Markdown `analysis_report.md`, and
+9 PNG charts under `charts/`.
+
+`ttft_ms` is always `None` in this redesign -- no verified provider
+per-token timing distinct from the first SSE event's own arrival time was
+found for Groq (see `labs.lab06_streaming.runner`'s module docstring for
+the SDK-source-verified investigation). `first_event_to_visible_gap_ms`
+shows the gap between the first event and the first MEANINGFUL visible
+content (whitespace-only chunks don't count), which can reflect reasoning
+generation, metadata-only events, or transport buffering -- the
+measurement alone doesn't prove which.
+
+Streaming token usage is requested via `extra_body={"stream_options":
+{"include_usage": true}}` (verified supported by the installed Groq SDK);
+when the provider doesn't populate it, `usage_status` stays
+`USAGE_UNAVAILABLE` and token/cost fields stay `None` rather than being
+estimated from chunk counts. Compare the printed `Perceived Latency Gain`
+per pair -- a negative value (streaming's first visible content arrived
+LATER than the non-streaming full response) is reported exactly as
+measured, never hidden.
 
 ## Lab07 -- Rate Limiting & Retry Strategies (fully simulated)
 
-**Objective:** compare retry strategies (no backoff, exponential backoff,
-exponential backoff with jitter, retry-after-aware) under a controlled,
-simulated sequence of HTTP 429 responses.
+**Objective:** compare four retry strategies (`no_backoff`,
+`exponential_backoff`, `exponential_backoff_with_jitter`,
+`rate_limit_aware`) across five controlled scenarios -- fixed transient
+failures, a server recovery window, multi-client shared contention
+(thundering herd), Retry-After header variations, and request/token quota
+pressure -- using a deterministic virtual clock. This lab never calls the
+real Groq API, in any mode, and never needs `GROQ_API_KEY`.
 
 ```
-uv run lab-cli lab07 all
+# Default Grand Test (3 scenarios x 4 strategies = 12 simulation runs):
+uv run lab-cli lab07 all --config config/default.toml
+
+# Pilot (1 scenario x 4 strategies = 4 runs) / Extended (5 scenarios x 4 = 20 runs):
+uv run lab-cli lab07 all --profile pilot --config config/default.toml
+uv run lab-cli lab07 all --profile extended --config config/default.toml
+
+# Run only one strategy or one scenario:
+uv run lab-cli lab07 exponential_backoff_with_jitter --config config/default.toml
+uv run lab-cli lab07 all --scenario shared_contention --config config/default.toml
+
+# Legacy flags still work (force a single-scenario run):
+uv run lab-cli lab07 no_backoff --fail-count 4 --config config/default.toml
+
+# Regenerate charts for every completed run (and the legacy flat-file
+# backfill), offline:
+uv run lab-cli lab07 backfill --config config/default.toml
 ```
 
-This lab never calls the real Groq API -- it is explicitly simulation-based,
-per the project's policy against deliberately exceeding real rate limits.
-Compare `total_wait_seconds` and `retry_count` across strategies.
+Results land in `results/lab07_rate_limiting/<run_id>/`: the per-attempt
+`attempt_timeline.csv`, per-client `raw_measurements.json/csv`,
+`strategy_summary.csv`, `scenario_comparison.csv` (pivoted by scenario), a
+Markdown `analysis_report.md`, and 9 PNG charts under `charts/`.
+
+Compare `success_rate` (reliability) and `total_scheduled_wait_seconds`/
+`total_429_responses` (efficiency) SEPARATELY across strategies -- the
+strategy with the lowest wait time is never, by itself, the best
+strategy. `retry_count` excludes the initial attempt and never counts a
+client's final failed attempt as an extra retry. All figures are
+synthetic simulation data (`real_api_calls: 0`, `real_token_usage: null`),
+never real Groq telemetry.
 
 ## Lab08 -- Async Processing & Concurrency
 

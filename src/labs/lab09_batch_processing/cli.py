@@ -6,9 +6,14 @@ from pathlib import Path
 
 from lab_core.lab_cli_support import add_common_arguments, build_context
 from lab_core.results_writer import append_csv, write_json
-from labs.lab08_concurrency.experiments import PROMPTS, run_concurrent, run_sequential
 from labs.lab09_batch_processing.batch import download_batch_results, poll_batch_status, submit_batch_job
-from labs.lab09_batch_processing.experiments import batch_output_to_results, prepare_batch_input_file
+from labs.lab09_batch_processing.experiments import (
+    PROMPTS,
+    batch_output_to_results,
+    prepare_batch_input_file,
+    run_concurrent,
+    run_sequential,
+)
 
 LAB_ID = "lab09"
 

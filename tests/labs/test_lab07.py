@@ -1,147 +1,176 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
+from datetime import datetime, timedelta, timezone
 
-import pytest
+from labs.lab07_rate_limiting.retry_after import MAX_SANE_RETRY_AFTER_SECONDS, parse_retry_after
+from labs.lab07_rate_limiting.server_simulator import SimulatedServer
 
-from lab_core.config import RetryConfig
-from labs.lab07_rate_limiting.experiments import run_retry_strategy
-from labs.lab07_rate_limiting.retry_runner import call_with_retry
-from labs.lab07_rate_limiting.simulated_client import FlakyClient, make_rate_limit_error
+_NOW = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
-def _retry_config(**overrides) -> RetryConfig:
-    defaults = dict(max_attempts=5, base_delay_seconds=1.0, max_delay_seconds=30.0, jitter=False)
-    defaults.update(overrides)
-    return RetryConfig(**defaults)
+# --- Retry-After parsing ----------------------------------------------------
 
 
-class _FakeCompletions:
-    def create(self, **kwargs):
-        usage = SimpleNamespace(
-            prompt_tokens=1,
-            completion_tokens=1,
-            total_tokens=2,
-            total_time=0.01,
-            prompt_tokens_details=None,
-            completion_tokens_details=None,
-        )
-        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))], usage=usage)
+def test_missing_header_is_invalid():
+    result = parse_retry_after(None)
+    assert result.valid is False
+    assert result.reason == "missing"
 
 
-class _FakeSuccessClient:
-    def __init__(self):
-        self.chat = SimpleNamespace(completions=_FakeCompletions())
+def test_empty_string_header_is_invalid():
+    result = parse_retry_after("   ")
+    assert result.valid is False
+    assert result.reason == "missing"
 
 
-def test_make_rate_limit_error_carries_retry_after_header():
-    error = make_rate_limit_error(retry_after_seconds="7")
-    assert error.response.status_code == 429
-    assert error.response.headers.get("retry-after") == "7"
+def test_valid_integer_seconds():
+    result = parse_retry_after("7")
+    assert result.valid is True
+    assert result.delay_seconds == 7.0
+    assert result.reason == "numeric_seconds"
 
 
-def test_flaky_client_fails_exactly_fail_count_times_then_succeeds():
-    client = FlakyClient(_FakeSuccessClient(), fail_count=2)
-    from groq import RateLimitError
-
-    with pytest.raises(RateLimitError):
-        client.chat.completions.create(model="x", messages=[])
-    with pytest.raises(RateLimitError):
-        client.chat.completions.create(model="x", messages=[])
-    response = client.chat.completions.create(model="x", messages=[])
-    assert response.choices[0].message.content == "ok"
+def test_valid_decimal_seconds():
+    result = parse_retry_after("2.5")
+    assert result.valid is True
+    assert result.delay_seconds == 2.5
 
 
-def test_call_with_retry_no_backoff_never_sleeps():
-    client = FlakyClient(_FakeSuccessClient(), fail_count=2)
-    sleeps = []
-    outcome = call_with_retry(
-        client=client,
-        max_attempts=5,
-        base_delay_seconds=1.0,
-        max_delay_seconds=30.0,
-        jitter=False,
-        use_backoff=False,
-        respect_retry_after=False,
-        sleep_fn=sleeps.append,
-        model="x",
-        messages=[],
-    )
-    assert outcome.succeeded is True
-    assert outcome.retry_count == 2
-    assert sleeps == []  # no_backoff uses a zero delay, so sleep_fn is never invoked
+def test_zero_is_valid_immediate_retry():
+    result = parse_retry_after("0")
+    assert result.valid is True
+    assert result.delay_seconds == 0.0
 
 
-def test_call_with_retry_exponential_backoff_grows_delays():
-    client = FlakyClient(_FakeSuccessClient(), fail_count=3)
-    sleeps = []
-    outcome = call_with_retry(
-        client=client,
-        max_attempts=5,
-        base_delay_seconds=1.0,
-        max_delay_seconds=30.0,
-        jitter=False,
-        use_backoff=True,
-        respect_retry_after=False,
-        sleep_fn=sleeps.append,
-        model="x",
-        messages=[],
-    )
-    assert outcome.succeeded is True
-    assert outcome.retry_count == 3
-    assert sleeps == [1.0, 2.0, 4.0]
+def test_negative_is_invalid():
+    result = parse_retry_after("-5")
+    assert result.valid is False
+    assert result.reason == "negative"
 
 
-def test_call_with_retry_respects_retry_after_header():
-    client = FlakyClient(_FakeSuccessClient(), fail_count=1, retry_after_seconds="9")
-    sleeps = []
-    outcome = call_with_retry(
-        client=client,
-        max_attempts=3,
-        base_delay_seconds=1.0,
-        max_delay_seconds=30.0,
-        jitter=False,
-        use_backoff=True,
-        respect_retry_after=True,
-        sleep_fn=sleeps.append,
-        model="x",
-        messages=[],
-    )
-    assert sleeps == [9.0]
-    assert outcome.succeeded is True
+def test_nan_is_invalid():
+    result = parse_retry_after("nan")
+    assert result.valid is False
+    assert result.reason == "nan"
 
 
-def test_call_with_retry_gives_up_after_max_attempts():
-    client = FlakyClient(_FakeSuccessClient(), fail_count=10)
-    outcome = call_with_retry(
-        client=client,
-        max_attempts=3,
-        base_delay_seconds=0.01,
-        max_delay_seconds=0.02,
-        jitter=False,
-        use_backoff=True,
-        respect_retry_after=False,
-        sleep_fn=lambda s: None,
-        model="x",
-        messages=[],
-    )
-    assert outcome.succeeded is False
-    assert outcome.retry_count == 3
-    assert outcome.error is not None
+def test_infinity_is_invalid():
+    result = parse_retry_after("inf")
+    assert result.valid is False
+    assert result.reason == "infinite"
 
 
-def test_run_retry_strategy_no_backoff():
-    result = run_retry_strategy(
-        strategy="no_backoff",
-        retry_config=_retry_config(),
-        fail_count=2,
-        sleep_fn=lambda s: None,
-    )
-    assert result.metadata.model_parameters["succeeded"] is True
-    assert result.metadata.retry_count == 2
-    assert result.metadata.model_parameters["total_wait_seconds"] == 0.0
+def test_malformed_string_is_invalid():
+    result = parse_retry_after("not-a-number")
+    assert result.valid is False
+    assert result.reason == "malformed"
 
 
-def test_run_retry_strategy_rejects_unknown_strategy():
-    with pytest.raises(ValueError):
-        run_retry_strategy(strategy="bogus", retry_config=_retry_config(), fail_count=1)
+def test_excessively_large_value_is_invalid_never_truncated():
+    result = parse_retry_after(str(MAX_SANE_RETRY_AFTER_SECONDS + 1))
+    assert result.valid is False
+    assert result.reason == "excessive"
+    assert result.delay_seconds is None  # never a clamped/truncated value
+
+
+def test_http_date_valid_with_injected_clock():
+    future = _NOW + timedelta(seconds=10)
+    header = future.strftime("%a, %d %b %Y %H:%M:%S GMT")
+    result = parse_retry_after(header, now_utc=_NOW)
+    assert result.valid is True
+    assert abs(result.delay_seconds - 10.0) < 1e-6
+    assert result.reason == "http_date"
+
+
+def test_http_date_without_injected_clock_is_unusable_not_real_wall_clock():
+    future = _NOW + timedelta(seconds=10)
+    header = future.strftime("%a, %d %b %Y %H:%M:%S GMT")
+    result = parse_retry_after(header, now_utc=None)
+    assert result.valid is False
+    assert result.reason == "http_date_without_injected_clock"
+
+
+def test_http_date_in_the_past_is_treated_as_immediate():
+    past = _NOW - timedelta(seconds=10)
+    header = past.strftime("%a, %d %b %Y %H:%M:%S GMT")
+    result = parse_retry_after(header, now_utc=_NOW)
+    assert result.valid is True
+    assert result.delay_seconds == 0.0
+
+
+def test_excessive_http_date_is_invalid():
+    future = _NOW + timedelta(seconds=MAX_SANE_RETRY_AFTER_SECONDS + 100)
+    header = future.strftime("%a, %d %b %Y %H:%M:%S GMT")
+    result = parse_retry_after(header, now_utc=_NOW)
+    assert result.valid is False
+    assert result.reason == "excessive"
+
+
+def test_never_raises_on_any_input():
+    for value in (None, "", "   ", "abc", "-1", "nan", "inf", "99999999999", "garbage date string"):
+        parse_retry_after(value, now_utc=_NOW)  # must not raise
+
+
+# --- Simulated server --------------------------------------------------------
+
+
+def test_fixed_transient_failures_rejects_exactly_fail_count_times():
+    server = SimulatedServer(fail_count=2)
+    statuses = [server.handle(0.0, 0, attempt).http_status for attempt in (1, 2, 3)]
+    assert statuses == [429, 429, 200]
+
+
+def test_recovery_window_rejects_before_recovery_time():
+    server = SimulatedServer(recovery_time=3.0)
+    assert server.handle(2.9, 0, 1).http_status == 429
+    assert server.handle(3.0, 0, 1).http_status == 200
+
+
+def test_retry_after_variant_only_applies_to_first_attempt():
+    server = SimulatedServer(retry_after_variants={0: "5"})
+    first = server.handle(0.0, 0, 1)
+    assert first.http_status == 429
+    assert first.retry_after_header == "5"
+    second = server.handle(0.0, 0, 2)
+    assert second.http_status == 200  # no second rejection -- one-shot
+
+
+def test_shared_capacity_rejects_once_window_is_full():
+    server = SimulatedServer(window_seconds=1.0, capacity_requests_per_window=2)
+    responses = [server.handle(0.1, cid, 1) for cid in (0, 1, 2)]
+    statuses = [r.http_status for r in responses]
+    assert statuses == [200, 200, 429]
+    assert responses[2].collision is True
+
+
+def test_shared_capacity_resets_in_the_next_window():
+    server = SimulatedServer(window_seconds=1.0, capacity_requests_per_window=1)
+    assert server.handle(0.1, 0, 1).http_status == 200
+    assert server.handle(0.2, 1, 1).http_status == 429
+    assert server.handle(1.1, 2, 1).http_status == 200  # new window, capacity reset
+
+
+def test_token_quota_rejects_when_token_demand_exceeds_cap():
+    server = SimulatedServer(window_seconds=10.0, capacity_tokens_per_window=150)
+    first = server.handle(0.0, 0, 1, token_demand=100)
+    second = server.handle(0.0, 1, 1, token_demand=100)
+    assert first.http_status == 200
+    assert second.http_status == 429
+    assert second.collision is True
+
+
+def test_legacy_fail_count_retry_after_injection():
+    server = SimulatedServer(fail_count=1, fail_count_retry_after="9")
+    response = server.handle(0.0, 0, 1)
+    assert response.http_status == 429
+    assert response.retry_after_header == "9"
+
+
+def test_mechanisms_apply_in_documented_order_fail_count_before_recovery():
+    # recovery_time is in the future, AND fail_count is also set -- the
+    # fixed-fail-count mechanism (checked first) determines the outcome
+    # for attempts within its count, regardless of recovery_time.
+    server = SimulatedServer(fail_count=1, recovery_time=100.0)
+    assert server.handle(0.0, 0, 1).http_status == 429  # fail_count rule
+    # attempt 2 is beyond fail_count, so now recovery_time's rule applies.
+    assert server.handle(0.0, 0, 2).http_status == 429  # recovery_time rule (0.0 < 100.0)

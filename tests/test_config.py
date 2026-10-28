@@ -419,3 +419,263 @@ def test_lab04_negative_max_estimated_cost_rejected(tmp_path):
     broken = VALID_TOML + "\n[lab04]\nmax_estimated_cost_usd = -1.0\n"
     with pytest.raises(ConfigError):
         load_config(_write(tmp_path, broken))
+
+
+# --- lab05: small_model/large_model stay required; everything else is new,
+#     optional, documented defaults -------------------------------------
+
+
+def _with_lab05_overrides(extra_lines: str) -> str:
+    # VALID_TOML already has one [lab05] table -- TOML forbids a second
+    # [lab05] header, so new keys are injected into the EXISTING table
+    # instead of appending a conflicting second one.
+    return VALID_TOML.replace(
+        '[lab05]\nsmall_model = "llama-3.1-8b-instant"\nlarge_model = "llama-3.3-70b-versatile"\n',
+        '[lab05]\nsmall_model = "llama-3.1-8b-instant"\nlarge_model = "llama-3.3-70b-versatile"\n' + extra_lines,
+    )
+
+
+def test_lab05_section_with_only_legacy_keys_still_gets_documented_defaults(tmp_path):
+    config = load_config(_write(tmp_path, VALID_TOML))
+    lab05 = config.lab05
+    assert lab05.small_model == "llama-3.1-8b-instant"
+    assert lab05.large_model == "llama-3.3-70b-versatile"
+    assert lab05.default_profile == "default"
+    assert lab05.reasoning_effort == "low"
+    assert lab05.max_completion_tokens == 1024
+    assert lab05.max_api_calls == 18
+    assert lab05.max_estimated_cost_usd == 0.05
+
+
+def test_lab05_section_present_overrides_defaults(tmp_path):
+    toml = _with_lab05_overrides(
+        'default_profile = "pilot"\n'
+        'reasoning_effort = "high"\n'
+        "max_completion_tokens = 512\n"
+        "randomize_task_order = true\n"
+        "randomization_seed = 7\n"
+        "max_api_calls = 8\n"
+        "max_estimated_cost_usd = 0.25\n"
+    )
+    config = load_config(_write(tmp_path, toml))
+    lab05 = config.lab05
+    assert lab05.default_profile == "pilot"
+    assert lab05.reasoning_effort == "high"
+    assert lab05.max_completion_tokens == 512
+    assert lab05.randomize_task_order is True
+    assert lab05.randomization_seed == 7
+    assert lab05.max_api_calls == 8
+    assert lab05.max_estimated_cost_usd == 0.25
+
+
+def test_lab05_invalid_profile_rejected(tmp_path):
+    broken = _with_lab05_overrides('default_profile = "nonexistent"\n')
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab05_unsupported_reasoning_effort_rejected(tmp_path):
+    broken = _with_lab05_overrides('reasoning_effort = "extreme"\n')
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab05_unknown_key_rejected(tmp_path):
+    broken = _with_lab05_overrides("not_a_real_key = 1\n")
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab05_negative_max_estimated_cost_rejected(tmp_path):
+    broken = _with_lab05_overrides("max_estimated_cost_usd = -1.0\n")
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+# --- lab06: entirely optional, documented defaults -------------------------
+
+
+def test_lab06_section_absent_still_gets_documented_defaults(tmp_path):
+    config = load_config(_write(tmp_path, VALID_TOML))
+    lab06 = config.lab06
+    assert lab06.enabled is True
+    assert lab06.model == "openai/gpt-oss-20b"
+    assert lab06.default_profile == "default"
+    assert lab06.paired_repetitions == 5
+    assert lab06.reasoning_effort == "low"
+    assert lab06.max_completion_tokens == 768
+    assert lab06.request_usage_when_supported is True
+    assert lab06.record_event_timeline is True
+    assert lab06.max_api_calls == 16
+    assert lab06.max_estimated_cost_usd == 0.05
+
+
+def test_lab06_section_present_overrides_defaults(tmp_path):
+    toml = VALID_TOML + """
+[lab06]
+enabled = true
+model = "openai/gpt-oss-120b"
+default_profile = "pilot"
+paired_repetitions = 3
+reasoning_effort = "high"
+max_completion_tokens = 512
+randomize_condition_order = true
+randomization_seed = 7
+request_usage_when_supported = false
+record_event_timeline = false
+max_api_calls = 8
+max_estimated_cost_usd = 0.25
+"""
+    config = load_config(_write(tmp_path, toml))
+    lab06 = config.lab06
+    assert lab06.model == "openai/gpt-oss-120b"
+    assert lab06.default_profile == "pilot"
+    assert lab06.paired_repetitions == 3
+    assert lab06.reasoning_effort == "high"
+    assert lab06.max_completion_tokens == 512
+    assert lab06.randomize_condition_order is True
+    assert lab06.randomization_seed == 7
+    assert lab06.request_usage_when_supported is False
+    assert lab06.record_event_timeline is False
+    assert lab06.max_api_calls == 8
+    assert lab06.max_estimated_cost_usd == 0.25
+
+
+def test_lab06_non_positive_paired_repetitions_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab06]\npaired_repetitions = 0\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab06_invalid_profile_rejected(tmp_path):
+    broken = VALID_TOML + '\n[lab06]\ndefault_profile = "nonexistent"\n'
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab06_unsupported_reasoning_effort_rejected(tmp_path):
+    broken = VALID_TOML + '\n[lab06]\nreasoning_effort = "extreme"\n'
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab06_unknown_key_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab06]\nnot_a_real_key = 1\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab06_negative_max_estimated_cost_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab06]\nmax_estimated_cost_usd = -1.0\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+# --- lab07: entirely optional, documented defaults -------------------------
+
+
+def test_lab07_section_absent_still_gets_documented_defaults(tmp_path):
+    config = load_config(_write(tmp_path, VALID_TOML))
+    lab07 = config.lab07
+    assert lab07.enabled is True
+    assert lab07.default_profile == "default"
+    assert lab07.randomization_seed == 42
+    assert lab07.max_simulation_events == 10000
+    assert lab07.max_clients == 50
+    assert lab07.max_attempts == 5
+    assert lab07.base_delay_seconds == 1.0
+    assert lab07.max_delay_seconds == 30.0
+    assert lab07.max_total_wait_seconds == 120.0
+    assert lab07.simulation_deadline_seconds is None
+    assert lab07.transient_fail_count == 2
+    assert lab07.recovery_time_seconds == 3.0
+    assert lab07.contention_client_count == 8
+    assert lab07.contention_capacity_per_window == 2
+    assert lab07.quota_client_count == 3
+    assert lab07.quota_rpm == 5
+    assert lab07.quota_tpm == 250
+
+
+def test_lab07_section_present_overrides_defaults(tmp_path):
+    toml = VALID_TOML + """
+[lab07]
+enabled = true
+default_profile = "pilot"
+randomization_seed = 7
+max_simulation_events = 500
+max_clients = 10
+max_attempts = 3
+base_delay_seconds = 0.5
+max_delay_seconds = 10.0
+max_total_wait_seconds = 60.0
+transient_fail_count = 1
+recovery_time_seconds = 2.0
+contention_client_count = 4
+contention_capacity_per_window = 1
+contention_window_seconds = 0.5
+quota_client_count = 2
+quota_rpm = 3
+quota_tpm = 100
+quota_token_demand_per_request = 50
+quota_window_seconds = 30.0
+"""
+    config = load_config(_write(tmp_path, toml))
+    lab07 = config.lab07
+    assert lab07.default_profile == "pilot"
+    assert lab07.randomization_seed == 7
+    assert lab07.max_simulation_events == 500
+    assert lab07.max_clients == 10
+    assert lab07.max_attempts == 3
+    assert lab07.transient_fail_count == 1
+    assert lab07.recovery_time_seconds == 2.0
+    assert lab07.contention_client_count == 4
+
+
+def test_lab07_invalid_profile_rejected(tmp_path):
+    broken = VALID_TOML + '\n[lab07]\ndefault_profile = "nonexistent"\n'
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab07_zero_max_attempts_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab07]\nmax_attempts = 0\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab07_negative_transient_fail_count_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab07]\ntransient_fail_count = -1\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab07_zero_transient_fail_count_is_valid(tmp_path):
+    # Zero simulated failures (server succeeds on the very first attempt)
+    # is a legitimate configuration, not an error.
+    toml = VALID_TOML + "\n[lab07]\ntransient_fail_count = 0\n"
+    config = load_config(_write(tmp_path, toml))
+    assert config.lab07.transient_fail_count == 0
+
+
+def test_lab07_max_delay_less_than_base_delay_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab07]\nbase_delay_seconds = 10.0\nmax_delay_seconds = 1.0\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab07_contention_client_count_exceeding_max_clients_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab07]\nmax_clients = 2\ncontention_client_count = 8\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab07_quota_client_count_exceeding_max_clients_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab07]\nmax_clients = 2\nquota_client_count = 3\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab07_unknown_key_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab07]\nnot_a_real_key = 1\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))

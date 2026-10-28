@@ -1,0 +1,154 @@
+[
+  {
+    "task_id": "task_001",
+    "category": "factual_retrieval",
+    "complexity_label": "simple",
+    "prompt": "What is the capital of Italy? Answer with only the city name.",
+    "expected_answer": "Rome",
+    "evaluation_type": "exact_match",
+    "evaluation_config": {},
+    "source": "handcrafted",
+    "notes": "Baseline factual lookup -- no reasoning required."
+  },
+  {
+    "task_id": "task_002",
+    "category": "factual_retrieval",
+    "complexity_label": "simple",
+    "prompt": "In which four-digit year did the first crewed Moon landing occur? Answer with only the year.",
+    "expected_answer": "1969",
+    "evaluation_type": "numeric",
+    "evaluation_config": {"tolerance": 0},
+    "source": "handcrafted",
+    "notes": "Factual retrieval with a numeric answer."
+  },
+  {
+    "task_id": "task_003",
+    "category": "simple_arithmetic",
+    "complexity_label": "simple",
+    "prompt": "What is 12 + 7? Answer with only the number.",
+    "expected_answer": "19",
+    "evaluation_type": "numeric",
+    "evaluation_config": {"tolerance": 0},
+    "source": "handcrafted",
+    "notes": "Single-step arithmetic."
+  },
+  {
+    "task_id": "task_004",
+    "category": "simple_arithmetic",
+    "complexity_label": "simple",
+    "prompt": "What is 144 divided by 12? Answer with only the number.",
+    "expected_answer": "12",
+    "evaluation_type": "numeric",
+    "evaluation_config": {"tolerance": 0},
+    "source": "handcrafted",
+    "notes": "Single-step arithmetic."
+  },
+  {
+    "task_id": "task_005",
+    "category": "structured_extraction",
+    "complexity_label": "complex",
+    "prompt": "Extract the following fields from the invoice text below. Respond with EXACTLY three lines, each in the form \"field_name: value\", in this exact order, and nothing else: invoice_number, total_amount, due_date.\n\nInvoice Text:\nInvoice Number: INV-20394\nBilled To: Acme Corp\nTotal Amount Due: 482.50\nPayment Due Date: 2026-11-15\nThank you for your business.",
+    "expected_answer": "",
+    "evaluation_type": "multi_field",
+    "evaluation_config": {
+      "required_fields": ["invoice_number", "total_amount", "due_date"],
+      "expected_values": {"invoice_number": "INV-20394", "total_amount": "482.50", "due_date": "2026-11-15"}
+    },
+    "source": "handcrafted",
+    "notes": "Structured information extraction from unstructured text -- labeled 'complex' in the dataset, but this label is NEVER read by the router."
+  },
+  {
+    "task_id": "task_006",
+    "category": "structured_extraction",
+    "complexity_label": "complex",
+    "prompt": "Extract the following fields from the support ticket text below. Respond with EXACTLY two lines, each in the form \"field_name: value\", in this exact order, and nothing else: ticket_priority, assigned_team.\n\nSupport Ticket:\nSubject: Checkout page returns a 500 error for all EU customers\nPriority: High\nAssigned Team: Billing\nDescription: Reported by three separate customers in the last hour.",
+    "expected_answer": "",
+    "evaluation_type": "multi_field",
+    "evaluation_config": {
+      "required_fields": ["ticket_priority", "assigned_team"],
+      "expected_values": {"ticket_priority": "High", "assigned_team": "Billing"}
+    },
+    "source": "handcrafted",
+    "notes": "Structured information extraction, second instance."
+  },
+  {
+    "task_id": "task_007",
+    "category": "classification",
+    "complexity_label": "simple",
+    "prompt": "Classify the sentiment of this product review as exactly one of: positive, negative, neutral. Review: \"This blender broke after two uses and customer support never replied.\" Respond with only the single word label.",
+    "expected_answer": "negative",
+    "evaluation_type": "classification",
+    "evaluation_config": {"allowed_labels": ["positive", "negative", "neutral"]},
+    "source": "handcrafted",
+    "notes": "Three-way sentiment classification."
+  },
+  {
+    "task_id": "task_008",
+    "category": "classification",
+    "complexity_label": "simple",
+    "prompt": "Classify this email as exactly one of: spam, not_spam. Email: \"Subject: You WON $5,000,000!!! Click this link within 24 hours to claim your prize, no fees required.\" Respond with only the single label (spam or not_spam).",
+    "expected_answer": "spam",
+    "evaluation_type": "classification",
+    "evaluation_config": {"allowed_labels": ["spam", "not_spam"]},
+    "source": "handcrafted",
+    "notes": "Binary classification, second instance."
+  },
+  {
+    "task_id": "task_009",
+    "category": "multi_step_reasoning",
+    "complexity_label": "complex",
+    "prompt": "A bakery sells cupcakes in boxes of 6. On Monday they sold 7 full boxes. On Tuesday they sold 3 full boxes plus 23 individual cupcakes. How many cupcakes did they sell in total over the two days? Answer with only the number.",
+    "expected_answer": "83",
+    "evaluation_type": "numeric",
+    "evaluation_config": {"tolerance": 0},
+    "source": "handcrafted",
+    "notes": "Requires two intermediate multiplications plus an addition before the final answer (7*6 + 3*6 + 23 = 83)."
+  },
+  {
+    "task_id": "task_010",
+    "category": "multi_constraint_decision",
+    "complexity_label": "complex",
+    "prompt": "A loan applicant qualifies only if ALL of the following are true: credit_score is at least 650, debt_to_income_ratio is below 40%, and employment_years is at least 2. Applicant data: credit_score=680, debt_to_income_ratio=35%, employment_years=3. Does the applicant qualify? Answer with only Yes or No.",
+    "expected_answer": "Yes",
+    "evaluation_type": "classification",
+    "evaluation_config": {"allowed_labels": ["Yes", "No"]},
+    "source": "handcrafted",
+    "notes": "Requires evaluating three independent constraints jointly (logical AND)."
+  },
+  {
+    "task_id": "task_011",
+    "category": "conditional_business_rule",
+    "complexity_label": "complex",
+    "prompt": "A store's shipping rule: if the order subtotal is at least $50, shipping is free ($0.00); otherwise shipping costs exactly $5.99. The order subtotal is $42.50. What is the shipping cost? Answer with only the dollar amount, e.g. 5.99",
+    "expected_answer": "5.99",
+    "evaluation_type": "numeric",
+    "evaluation_config": {"tolerance": 0},
+    "source": "handcrafted",
+    "notes": "Requires applying a single conditional business rule correctly."
+  },
+  {
+    "task_id": "task_012",
+    "category": "structured_output_generation",
+    "complexity_label": "complex",
+    "prompt": "Generate a JSON object describing a person with exactly two fields: \"name\" (string) and \"age\" (integer). The person's name is Alice and her age is 30. Respond with ONLY the JSON object, no other text.",
+    "expected_answer": "",
+    "evaluation_type": "json_schema",
+    "evaluation_config": {
+      "required_fields": ["name", "age"],
+      "expected_values": {"name": "Alice", "age": "30"}
+    },
+    "source": "handcrafted",
+    "notes": "Requires generating valid, schema-conforming JSON, not just extracting it from given text."
+  },
+  {
+    "task_id": "task_013",
+    "category": "code_generation",
+    "complexity_label": "complex",
+    "prompt": "Write a Python function named is_palindrome(s) that returns True if s is a palindrome (ignoring case), False otherwise. Output only the code, no explanation.",
+    "expected_answer": "",
+    "evaluation_type": "structural_validation_only",
+    "evaluation_config": {"function_name": "is_palindrome", "min_params": 1},
+    "source": "handcrafted",
+    "notes": "Bonus task, outside the 8 required categories. Evaluated via AST signature check ONLY (no sandboxed execution) -- answer_correct is always None for this evaluation_type; a matching function signature is NOT functional correctness."
+  }
+]

@@ -1,32 +1,27 @@
 from __future__ import annotations
 
-from labs.lab06_streaming.experiments import run_non_streaming, run_streaming
+from labs.lab06_streaming.experiments import INCIDENT_DESCRIPTION, REQUIRED_SECTIONS, build_incident_messages
 
 
-def test_non_streaming_computes_output_tokens_per_second(fake_sync_client_factory, make_response, config_with_pricing):
-    client = fake_sync_client_factory([make_response(completion_tokens=100)])
-    result = run_non_streaming(client, config_with_pricing, "llama-3.1-8b-instant")
-
-    assert result.tokens_and_cost.completion_tokens == 100
-    assert result.performance.output_tokens_per_second is not None
-    assert result.performance.output_tokens_per_second > 0
+def test_required_sections_has_exactly_five_headings():
+    assert len(REQUIRED_SECTIONS) == 5
 
 
-def test_streaming_measures_ttft_before_first_visible_content(fake_sync_client_factory, make_chunk, config_with_pricing):
-    # First chunk carries no visible text (e.g. a role-only delta), second chunk does.
-    chunks = [make_chunk(content=None), make_chunk(content="Once"), make_chunk(content=" upon a time")]
-    client = fake_sync_client_factory([chunks])
-
-    result = run_streaming(client, config_with_pricing, "llama-3.1-8b-instant")
-
-    assert result.performance.ttft_ms is not None
-    assert result.performance.first_visible_content_ms is not None
-    assert result.performance.ttft_ms <= result.performance.first_visible_content_ms
-    assert result.metadata.model_parameters["chunk_count"] == 3
+def test_incident_messages_are_byte_identical_across_calls():
+    a = build_incident_messages()
+    b = build_incident_messages()
+    assert a == b
 
 
-def test_streaming_never_fabricates_token_usage(fake_sync_client_factory, make_chunk, config_with_pricing):
-    client = fake_sync_client_factory([[make_chunk(content="hi")]])
-    result = run_streaming(client, config_with_pricing, "llama-3.1-8b-instant")
-    assert result.tokens_and_cost.prompt_tokens is None
-    assert result.tokens_and_cost.completion_tokens is None
+def test_incident_messages_contain_the_incident_description_and_every_heading():
+    messages = build_incident_messages()
+    content = messages[0]["content"]
+    assert INCIDENT_DESCRIPTION.strip()[:30] in content
+    for heading in REQUIRED_SECTIONS:
+        assert heading in content
+
+
+def test_incident_messages_is_a_single_user_message():
+    messages = build_incident_messages()
+    assert len(messages) == 1
+    assert messages[0]["role"] == "user"
