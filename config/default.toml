@@ -135,6 +135,55 @@ cache_probe_calls = 3
 [lab09]
 batch_completion_window = "24h"
 
+[lab04]
+# Lab04's output-control/invocation-optimization experiment. Entirely
+# optional (see lab_core.config._build_lab04): a config file that omits
+# [lab04] entirely gets exactly these defaults, matching this project's
+# documented default experiment matrix: 3 output-limit values x 2
+# repetitions (6 calls) + 1 single-invocation call + 3 multiple-invocation
+# calls = 10 planned calls.
+enabled = true
+
+# GPT-OSS specifically, not groq.default_model's generic fallback: this
+# experiment studies reasoning-token consumption of a completion budget,
+# which requires a reasoning-capable model.
+model = "openai/gpt-oss-20b"
+
+# "restrictive" / "moderate" / "generous" output-token profiles (see
+# labs.lab04_output_control.experiments.OUTPUT_LIMIT_PROFILE_NAMES). No
+# duplicates allowed -- each value must be a genuinely distinct condition.
+output_limit_values = [64, 256, 1024]
+output_limit_repetitions = 2
+
+# openai/gpt-oss-20b/120b only support these three reasoning_effort levels
+# (see SUPPORTED_REASONING_EFFORTS above). The SAME value is used for both
+# of Lab04's experiments, by design.
+reasoning_effort = "low"
+
+# Deliberately generous (same rationale as lab02/lab03's own
+# max_completion_tokens default): invocation_comparison studies invocation
+# COUNT, not output budgeting, so its own budget must not itself truncate
+# answers -- that failure mode is output_limit_sweep's subject, not this
+# experiment's.
+invocation_max_completion_tokens = 2048
+
+# Only "sequential" is implemented -- concurrent execution is LAB08's
+# subject, not LAB04's.
+invocation_execution_mode = "sequential"
+
+# Request-count safety net: exactly this project's documented default
+# matrix (3 x 2 + 1 + 3 = 10). A CLI override that would push the plan
+# above this is refused before any API call is made -- raise this
+# deliberately, never by accident, if you intend more.
+max_api_calls = 10
+
+# Cost safety net, derived from this file's own [pricing] and the
+# max_completion_tokens values above: worst case at the 10-call default is
+# 10 x 2048 x $0.30/1e6 (gpt-oss-20b output price) = $0.00614, plus a
+# negligible prompt-token share. $0.05 leaves generous headroom while
+# still being a real, enforced cap.
+max_estimated_cost_usd = 0.05
+
 [lab02]
 # Lab02's context-growth/context-bloat experiment. Unlike [lab01.effort]
 # below, this section is NOT required for Lab02 to work: omitting it

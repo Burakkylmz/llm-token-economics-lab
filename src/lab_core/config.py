@@ -85,6 +85,27 @@ class Lab03Config:
 
 
 @dataclass(frozen=True)
+class Lab04Config:
+    """Lab04's output-control/invocation-optimization experiment.
+
+    Entirely optional at the AppConfig level (same pattern as Lab02Config):
+    `lab04 all --live` must keep working with its documented 10-call default
+    (3 output-limit values x 2 repetitions + 1 single-invocation call + 3
+    multiple-invocation calls) even for a config that predates this section.
+    """
+
+    enabled: bool
+    model: str
+    output_limit_values: tuple[int, ...]
+    output_limit_repetitions: int
+    reasoning_effort: str
+    invocation_max_completion_tokens: int
+    invocation_execution_mode: str
+    max_api_calls: Optional[int]
+    max_estimated_cost_usd: Optional[float]
+
+
+@dataclass(frozen=True)
 class Lab09Config:
     batch_completion_window: str
 
@@ -185,6 +206,7 @@ class AppConfig:
     pricing: dict[str, ModelPricing]
     lab02: Lab02Config
     lab03: Lab03Config
+    lab04: Lab04Config
     lab05: Lab05Config
     lab09: Lab09Config
     lab01_factorial: Optional[Lab01FactorialConfig]
@@ -458,6 +480,133 @@ def _build_lab03(raw: dict) -> Lab03Config:
         max_api_calls=max_api_calls,
         max_estimated_cost_usd=max_estimated_cost_usd,
         cache_probe_calls=cache_probe_calls,
+    )
+
+
+def _validate_positive_int_list(values: object, label: str) -> list[int]:
+    if not isinstance(values, list) or not values:
+        raise ConfigError(f"{label} must be a non-empty list of positive integers")
+    result: list[int] = []
+    for raw_value in values:
+        if isinstance(raw_value, bool) or not isinstance(raw_value, int) or raw_value < 1:
+            raise ConfigError(f"{label} must contain only positive integers")
+        result.append(raw_value)
+    if len(set(result)) != len(result):
+        raise ConfigError(f"{label} contains duplicate values")
+    return result
+
+
+def _build_lab04(raw: dict) -> Lab04Config:
+    """Optional [lab04] section with safe, documented defaults: 3
+    output-limit values x 2 repetitions (6 calls) + 1 single-invocation
+    call + 3 multiple-invocation calls = 10 planned calls by default,
+    matching this project's documented default experiment matrix. A
+    config file that omits [lab04] entirely gets exactly these defaults.
+    """
+    section = raw.get("lab04", {})
+
+    enabled = section.get("enabled", True)
+    if not isinstance(enabled, bool):
+        raise ConfigError("lab04.enabled must be a boolean")
+
+    model = str(section.get("model", "openai/gpt-oss-20b"))
+
+    output_limit_values = _validate_positive_int_list(
+        section.get("output_limit_values", [64, 256, 1024]), "lab04.output_limit_values"
+    )
+
+    output_limit_repetitions = section.get("output_limit_repetitions", 2)
+    if (
+        isinstance(output_limit_repetitions, bool)
+        or not isinstance(output_limit_repetitions, int)
+        or output_limit_repetitions < 1
+    ):
+        raise ConfigError("lab04.output_limit_repetitions must be a positive integer")
+
+    # openai/gpt-oss-20b/120b only support these reasoning_effort levels --
+    # see SUPPORTED_REASONING_EFFORTS above. The SAME value is used for both
+    # the output-limit sweep and the invocation comparison, so "same
+    # reasoning effort across conditions" holds by construction rather than
+    # needing two separately-validated fields that could drift apart.
+    reasoning_effort = str(section.get("reasoning_effort", "low"))
+    if reasoning_effort not in SUPPORTED_REASONING_EFFORTS:
+        raise ConfigError(
+            f"lab04.reasoning_effort: unsupported value '{reasoning_effort}' -- "
+            f"this project's models only support {SUPPORTED_REASONING_EFFORTS}"
+        )
+
+    # Deliberately generous (same rationale as lab02/lab03's own
+    # max_completion_tokens default): the invocation-comparison experiment
+    # studies invocation COUNT, not output budgeting, so its own budget
+    # must not introduce the very truncation failure mode output_limit_sweep
+    # exists to study. Real cost is still driven by actual completion_tokens
+    # used, never by this ceiling.
+    invocation_max_completion_tokens = section.get("invocation_max_completion_tokens", 2048)
+    if (
+        isinstance(invocation_max_completion_tokens, bool)
+        or not isinstance(invocation_max_completion_tokens, int)
+        or invocation_max_completion_tokens < 1
+    ):
+        raise ConfigError("lab04.invocation_max_completion_tokens must be a positive integer")
+
+    # Only "sequential" is implemented/validated here by design -- concurrent
+    # multiple-invocation execution is LAB08's subject, not LAB04's; see this
+    # lab's module docstrings.
+    invocation_execution_mode = str(section.get("invocation_execution_mode", "sequential"))
+    if invocation_execution_mode != "sequential":
+        raise ConfigError(
+            "lab04.invocation_execution_mode: only 'sequential' is supported -- concurrent "
+            "execution is LAB08's subject, not LAB04's"
+        )
+
+    # Exactly this project's documented default experiment matrix (3 x 2 + 1
+    # + 3 = 10 calls). A CLI override that would push the plan above this is
+    # refused before any API call.
+    max_api_calls = section.get("max_api_calls", 10)
+    if max_api_calls is not None:
+        if isinstance(max_api_calls, bool) or not isinstance(max_api_calls, int) or max_api_calls < 1:
+            raise ConfigError("lab04.max_api_calls must be a positive integer or omitted")
+
+    # Worst case at the 10-call default: 10 x 2048 (the largest of
+    # output_limit_values/invocation_max_completion_tokens' defaults) x
+    # $0.30/1e6 (gpt-oss-20b output price) = $0.00614, plus a negligible
+    # prompt-token share. $0.05 leaves generous headroom while still being a
+    # real, enforced cap.
+    max_estimated_cost_usd = section.get("max_estimated_cost_usd", 0.05)
+    if max_estimated_cost_usd is not None:
+        if (
+            isinstance(max_estimated_cost_usd, bool)
+            or not isinstance(max_estimated_cost_usd, (int, float))
+            or max_estimated_cost_usd <= 0
+        ):
+            raise ConfigError("lab04.max_estimated_cost_usd must be a positive number or omitted")
+        max_estimated_cost_usd = float(max_estimated_cost_usd)
+
+    known_keys = {
+        "enabled",
+        "model",
+        "output_limit_values",
+        "output_limit_repetitions",
+        "reasoning_effort",
+        "invocation_max_completion_tokens",
+        "invocation_execution_mode",
+        "max_api_calls",
+        "max_estimated_cost_usd",
+    }
+    unknown_keys = set(section.keys()) - known_keys
+    if unknown_keys:
+        raise ConfigError(f"lab04 has unknown configuration key(s): {sorted(unknown_keys)}")
+
+    return Lab04Config(
+        enabled=enabled,
+        model=model,
+        output_limit_values=tuple(output_limit_values),
+        output_limit_repetitions=output_limit_repetitions,
+        reasoning_effort=reasoning_effort,
+        invocation_max_completion_tokens=invocation_max_completion_tokens,
+        invocation_execution_mode=invocation_execution_mode,
+        max_api_calls=max_api_calls,
+        max_estimated_cost_usd=max_estimated_cost_usd,
     )
 
 
@@ -742,6 +891,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         pricing=_build_pricing(raw),
         lab02=_build_lab02(raw),
         lab03=_build_lab03(raw),
+        lab04=_build_lab04(raw),
         lab05=_build_lab05(raw),
         lab09=_build_lab09(raw),
         lab01_factorial=_build_lab01_factorial(raw),

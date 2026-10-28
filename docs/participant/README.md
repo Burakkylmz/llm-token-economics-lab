@@ -350,19 +350,50 @@ file never stored response text to evaluate.
 
 ## Lab04 -- Output Control & Invocation Optimization
 
-**Objective:** see how `max_tokens` affects completion length/cost, and how
-batching several questions into one call compares to one call per question.
+**Objective:** see how `max_completion_tokens` limits completion
+length/cost -- and whether a restrictive budget damages answer
+completeness/correctness -- and how batching several questions into one
+call compares to one call per question (token/cost AND workflow-latency).
 
 ```
+# Preview the plan (10 calls by default: 3 output-limit values x 2
+# repetitions + 1 single-invocation call + 3 multiple-invocation calls) --
+# never calls the API, needs no API key:
+uv run lab-cli lab04 all --dry-run --config config/default.toml
+
+# Real execution:
 uv run lab-cli lab04 all --live --config config/live.toml
+
+# or, individually:
+uv run lab-cli lab04 output_limit_sweep --live --config config/live.toml
+uv run lab-cli lab04 invocation_comparison --live --config config/live.toml
+
+# Regenerate charts for every completed run (and the legacy flat-file
+# backfill), offline, no API key:
+uv run lab-cli lab04 backfill --config config/default.toml
 ```
 
-For `output_limit_sweep`, completion_tokens should track the `max_tokens`
-cap (until the model would have stopped earlier anyway). For
-`invocation_comparison`, compare the printed `single_invocation` vs
-`multiple_invocations` summaries: multiple calls repeat per-call overhead
-(and, in real deployments, added network round-trip latency) that one
-combined call avoids.
+Results land in `results/lab04_output_control/<run_id>/`: measurements
+(`output_limit_measurements.json/csv`, `invocation_measurements.json/csv`),
+summaries (`condition_summary.csv`, `invocation_comparison.csv`), a
+Markdown `analysis_report.md`, and 9 PNG charts under `charts/`.
+
+For `output_limit_sweep`, each condition sends the exact same
+retry-policy-extraction task (5 required fields); only
+`max_completion_tokens` varies. Truncation is read from the provider's own
+`finish_reason` field (`output_truncated` in the results), never guessed
+from `completion_tokens == max_completion_tokens` alone. Answer
+**completeness** (how many of the 5 fields are present) and **correctness**
+(how many present fields have the right value) are reported separately --
+a condition that uses fewer tokens but accepts fewer answers is not a
+successful optimization.
+
+For `invocation_comparison`, compare the printed `Single Invocation` vs
+`Multiple Invocations` summaries: the `Workflow Wall-Clock` line is the
+whole strategy's elapsed time (not the sum of individual request
+latencies, which are also printed separately), and `Quality Comparison`
+never calls a cheaper strategy "better" unless its answers were all
+accepted too.
 
 ## Lab05 -- Model Routing
 

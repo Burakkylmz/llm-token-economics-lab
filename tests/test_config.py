@@ -343,3 +343,79 @@ def test_lab03_negative_max_estimated_cost_rejected(tmp_path):
     broken = _with_lab03_overrides("max_estimated_cost_usd = -1.0\n")
     with pytest.raises(ConfigError):
         load_config(_write(tmp_path, broken))
+
+
+# --- lab04: entirely optional, documented defaults -------------------------
+
+
+def test_lab04_section_absent_still_gets_documented_defaults(tmp_path):
+    config = load_config(_write(tmp_path, VALID_TOML))
+    lab04 = config.lab04
+    assert lab04.enabled is True
+    assert lab04.model == "openai/gpt-oss-20b"
+    assert lab04.output_limit_values == (64, 256, 1024)
+    assert lab04.output_limit_repetitions == 2
+    assert lab04.reasoning_effort == "low"
+    assert lab04.invocation_execution_mode == "sequential"
+    assert lab04.max_api_calls == 10
+    assert lab04.max_estimated_cost_usd == 0.05
+
+
+def test_lab04_section_present_overrides_defaults(tmp_path):
+    toml = VALID_TOML + """
+[lab04]
+enabled = true
+model = "openai/gpt-oss-120b"
+output_limit_values = [32, 128]
+output_limit_repetitions = 3
+reasoning_effort = "high"
+invocation_max_completion_tokens = 512
+invocation_execution_mode = "sequential"
+max_api_calls = 20
+max_estimated_cost_usd = 0.25
+"""
+    config = load_config(_write(tmp_path, toml))
+    lab04 = config.lab04
+    assert lab04.model == "openai/gpt-oss-120b"
+    assert lab04.output_limit_values == (32, 128)
+    assert lab04.output_limit_repetitions == 3
+    assert lab04.reasoning_effort == "high"
+    assert lab04.invocation_max_completion_tokens == 512
+    assert lab04.max_api_calls == 20
+    assert lab04.max_estimated_cost_usd == 0.25
+
+
+def test_lab04_non_positive_output_limit_repetitions_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab04]\noutput_limit_repetitions = 0\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab04_duplicate_output_limit_values_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab04]\noutput_limit_values = [64, 64, 256]\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab04_unsupported_reasoning_effort_rejected(tmp_path):
+    broken = VALID_TOML + '\n[lab04]\nreasoning_effort = "extreme"\n'
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab04_non_sequential_invocation_execution_mode_rejected(tmp_path):
+    broken = VALID_TOML + '\n[lab04]\ninvocation_execution_mode = "parallel"\n'
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab04_unknown_key_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab04]\nnot_a_real_key = 1\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab04_negative_max_estimated_cost_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab04]\nmax_estimated_cost_usd = -1.0\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
