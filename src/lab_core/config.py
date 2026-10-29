@@ -309,6 +309,35 @@ class Lab02Config:
 
 
 @dataclass(frozen=True)
+class Lab10Config:
+    """Lab10's conversation-summarization experiment.
+
+    Entirely optional at the AppConfig level (same pattern as every other
+    lab added after Lab02): `lab10 all --live` must keep working with its
+    documented 14-call default (1 dataset x (2 summaries + 4 questions x 3
+    conditions)) even for a config that predates this section.
+
+    `summary_model`/`answer_model` are deliberately the SAME field
+    (`model`): the whole point of the experiment is to hold the answering
+    model/settings fixed across conditions, so there is no separate
+    answer-model knob to accidentally let drift from the summarization
+    model.
+    """
+
+    enabled: bool
+    model: str
+    default_profile: str
+    dataset_version: str
+    summarization_max_completion_tokens: int
+    answering_reasoning_effort: str
+    answering_max_completion_tokens: int
+    persist_synthetic_io: bool
+    show_all_io_in_terminal: bool
+    max_api_calls: Optional[int]
+    max_estimated_cost_usd: Optional[float]
+
+
+@dataclass(frozen=True)
 class AppConfig:
     groq: GroqConfig
     execution: ExecutionConfig
@@ -324,6 +353,7 @@ class AppConfig:
     lab07: Lab07Config
     lab08: Lab08Config
     lab09: Lab09Config
+    lab10: Lab10Config
     lab01_factorial: Optional[Lab01FactorialConfig]
     lab01_effort: Optional[Lab01EffortConfig]
 
@@ -1162,6 +1192,113 @@ def _build_lab09(raw: dict) -> Lab09Config:
     )
 
 
+LAB10_PROFILES = ("pilot", "default", "extended")
+LAB10_DATASET_IDS = ("customer_support_001", "technical_incident_001")
+
+
+def _build_lab10(raw: dict) -> Lab10Config:
+    """Optional [lab10] section with safe, documented defaults: 1 dataset x
+    (2 summaries + 4 questions x 3 conditions) = 14 planned calls by
+    default, matching this project's documented default experiment matrix.
+    A config file that omits [lab10] entirely gets exactly these defaults.
+    """
+    section = raw.get("lab10", {})
+
+    enabled = section.get("enabled", True)
+    if not isinstance(enabled, bool):
+        raise ConfigError("lab10.enabled must be a boolean")
+
+    model = str(section.get("model", "openai/gpt-oss-20b"))
+
+    default_profile = section.get("default_profile", "default")
+    if default_profile not in LAB10_PROFILES:
+        raise ConfigError(f"lab10.default_profile must be one of {LAB10_PROFILES}")
+
+    dataset_version = str(section.get("dataset_version", "v1"))
+    if not dataset_version:
+        raise ConfigError("lab10.dataset_version must be a non-empty string")
+
+    summarization_max_completion_tokens = section.get("summarization_max_completion_tokens", 1536)
+    if (
+        isinstance(summarization_max_completion_tokens, bool)
+        or not isinstance(summarization_max_completion_tokens, int)
+        or summarization_max_completion_tokens < 1
+    ):
+        raise ConfigError("lab10.summarization_max_completion_tokens must be a positive integer")
+
+    answering_reasoning_effort = str(section.get("answering_reasoning_effort", "low"))
+    if answering_reasoning_effort not in SUPPORTED_REASONING_EFFORTS:
+        raise ConfigError(
+            f"lab10.answering_reasoning_effort: unsupported value '{answering_reasoning_effort}' -- "
+            f"this project's models only support {SUPPORTED_REASONING_EFFORTS}"
+        )
+
+    answering_max_completion_tokens = section.get("answering_max_completion_tokens", 256)
+    if (
+        isinstance(answering_max_completion_tokens, bool)
+        or not isinstance(answering_max_completion_tokens, int)
+        or answering_max_completion_tokens < 1
+    ):
+        raise ConfigError("lab10.answering_max_completion_tokens must be a positive integer")
+
+    persist_synthetic_io = section.get("persist_synthetic_io", True)
+    if not isinstance(persist_synthetic_io, bool):
+        raise ConfigError("lab10.persist_synthetic_io must be a boolean")
+
+    show_all_io_in_terminal = section.get("show_all_io_in_terminal", False)
+    if not isinstance(show_all_io_in_terminal, bool):
+        raise ConfigError("lab10.show_all_io_in_terminal must be a boolean")
+
+    # Exactly this project's documented Extended Experiment ceiling (2
+    # datasets x (2 summaries + 4 questions x 3 conditions) = 28 calls) --
+    # the largest planned scope documented for this lab. A --profile
+    # override that would push the plan above this is refused before any
+    # API call.
+    max_api_calls = section.get("max_api_calls", 28)
+    if max_api_calls is not None:
+        if isinstance(max_api_calls, bool) or not isinstance(max_api_calls, int) or max_api_calls < 1:
+            raise ConfigError("lab10.max_api_calls must be a positive integer or omitted")
+
+    # Worst case at the 28-call extended ceiling: each call's output ceiling
+    # is at most summarization_max_completion_tokens (1536) -- 28 x 1536 x
+    # $0.30/1e6 (gpt-oss-20b output price) = $0.0129, plus a conservative
+    # prompt-token share (each conversation is a few thousand tokens at
+    # most). $0.10 leaves generous headroom while still being a real,
+    # enforced cap.
+    max_estimated_cost_usd = section.get("max_estimated_cost_usd", 0.10)
+    if max_estimated_cost_usd is not None:
+        if (
+            isinstance(max_estimated_cost_usd, bool)
+            or not isinstance(max_estimated_cost_usd, (int, float))
+            or max_estimated_cost_usd <= 0
+        ):
+            raise ConfigError("lab10.max_estimated_cost_usd must be a positive number or omitted")
+        max_estimated_cost_usd = float(max_estimated_cost_usd)
+
+    known_keys = {
+        "enabled", "model", "default_profile", "dataset_version", "summarization_max_completion_tokens",
+        "answering_reasoning_effort", "answering_max_completion_tokens", "persist_synthetic_io",
+        "show_all_io_in_terminal", "max_api_calls", "max_estimated_cost_usd",
+    }
+    unknown_keys = set(section.keys()) - known_keys
+    if unknown_keys:
+        raise ConfigError(f"lab10 has unknown configuration key(s): {sorted(unknown_keys)}")
+
+    return Lab10Config(
+        enabled=enabled,
+        model=model,
+        default_profile=default_profile,
+        dataset_version=dataset_version,
+        summarization_max_completion_tokens=summarization_max_completion_tokens,
+        answering_reasoning_effort=answering_reasoning_effort,
+        answering_max_completion_tokens=answering_max_completion_tokens,
+        persist_synthetic_io=persist_synthetic_io,
+        show_all_io_in_terminal=show_all_io_in_terminal,
+        max_api_calls=max_api_calls,
+        max_estimated_cost_usd=max_estimated_cost_usd,
+    )
+
+
 def _validate_nonempty_string_list(values: object, label: str) -> list[str]:
     if not isinstance(values, list) or not values:
         raise ConfigError(f"{label} must be a non-empty list of strings")
@@ -1434,6 +1571,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         lab07=_build_lab07(raw),
         lab08=_build_lab08(raw),
         lab09=_build_lab09(raw),
+        lab10=_build_lab10(raw),
         lab01_factorial=_build_lab01_factorial(raw),
         lab01_effort=_build_lab01_effort(raw),
     )

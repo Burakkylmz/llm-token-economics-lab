@@ -517,3 +517,59 @@ max_api_calls = 12
 # above that completion-token ceiling while still being a real, enforced
 # cap rather than "unlimited".
 max_estimated_cost_usd = 0.10
+
+[lab10]
+# Lab10's conversation-summarization experiment. Entirely optional (see
+# lab_core.config._build_lab10): a config file that omits [lab10] entirely
+# gets exactly these defaults, matching this project's documented default
+# experiment matrix: 1 dataset x (2 summaries + 4 questions x 3 conditions)
+# = 14 planned calls.
+enabled = true
+
+# Used for BOTH summarization and downstream answering -- the experiment's
+# whole point is to hold the answering model/settings fixed across
+# conditions, so there is deliberately no separate answer-model field.
+model = "openai/gpt-oss-20b"
+
+# "default" = 1 dataset (customer_support_001), 4 questions = 14 calls.
+# "pilot" = 1 dataset, 2 questions = 8 calls (fixed scope, not configurable
+# here). "extended" = both datasets, 4 questions each = 28 calls (fixed
+# scope). See labs.lab10_conversation_summarization.matrix.
+default_profile = "default"
+
+# Matches data/lab10/conversations_v1.json, golden_questions_v1.json,
+# golden_facts_v1.json. Recorded (with each file's SHA-256) in every run's
+# experiment_manifest.json so the exact dataset content used is traceable.
+dataset_version = "v1"
+
+# Must account for reasoning tokens as well as the structured JSON summary
+# itself -- large enough that a ~30-message, ~3000-character conversation's
+# summary is never truncated by its own reasoning overhead (finish_reason
+# is still recorded on every call, so truncation stays visible if it
+# happens despite this margin).
+summarization_max_completion_tokens = 1536
+
+# Held IDENTICAL across all three conditions (Full History / Low / Medium)
+# -- this is the experiment's critical control requirement. Only the
+# summarization effort varies between the Low and Medium conditions.
+answering_reasoning_effort = "low"
+answering_max_completion_tokens = 256
+
+# Full synthetic request/response payloads (Part 8) are persisted only for
+# this project's own approved synthetic datasets -- never for arbitrary
+# user-supplied conversations without explicit opt-in.
+persist_synthetic_io = true
+show_all_io_in_terminal = false
+
+# Exactly this project's documented Extended Experiment ceiling (2 datasets
+# x (2 summaries + 4 questions x 3 conditions) = 28 calls) -- the largest
+# planned scope documented for this lab. A --profile override that would
+# push the plan above this is refused before any API call.
+max_api_calls = 28
+
+# Worst case at the 28-call extended ceiling: 28 x 1536
+# summarization_max_completion_tokens x $0.30/1e6 (gpt-oss-20b output
+# price) = $0.0129, plus a conservative prompt-token share (each
+# conversation is a few thousand tokens at most). $0.10 leaves generous
+# headroom while still being a real, enforced cap.
+max_estimated_cost_usd = 0.10

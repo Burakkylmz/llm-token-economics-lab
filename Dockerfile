@@ -8,6 +8,7 @@ COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-install-project
 
 COPY config ./config
+COPY data ./data
 COPY src ./src
 COPY tests ./tests
 RUN uv sync --frozen

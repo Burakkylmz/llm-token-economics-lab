@@ -1,0 +1,42 @@
+{
+  "version": "v1",
+  "facts": {
+    "customer_support_001": {
+      "critical_facts": [
+        {"name": "order_id", "category": "identifier", "canonical_value": "ORD-74291"},
+        {"name": "delivery_city", "category": "confirmed", "canonical_value": "Izmir"},
+        {"name": "latest_delivery_date", "category": "decision_current", "canonical_value": "2026-11-05", "superseded_value": "2026-11-03"},
+        {"name": "latest_delivery_preference", "category": "decision_current", "canonical_value": "AFTERNOON", "superseded_value": "MORNING"},
+        {"name": "support_ticket", "category": "identifier", "canonical_value": "TKT-516"},
+        {"name": "return_status", "category": "open_issue", "canonical_value": "PENDING"},
+        {"name": "tracking_number", "category": "unresolved", "canonical_value": null}
+      ],
+      "known_fact_violation_checks": [
+        {"check_id": "preference_latest_is_morning", "description": "Summary states MORNING is the current/latest delivery preference instead of AFTERNOON."},
+        {"check_id": "original_date_as_latest", "description": "Summary states 2026-11-03 is the current/latest confirmed delivery date instead of 2026-11-05."},
+        {"check_id": "return_marked_approved", "description": "Summary states the return request is approved instead of pending."},
+        {"check_id": "tracking_number_invented", "description": "Summary invents a concrete tracking number value when none was stated in the conversation."}
+      ]
+    },
+    "technical_incident_001": {
+      "critical_facts": [
+        {"name": "incident_id", "category": "identifier", "canonical_value": "INC-2084"},
+        {"name": "service", "category": "confirmed", "canonical_value": "payments-api"},
+        {"name": "region", "category": "confirmed", "canonical_value": "eu-west-1"},
+        {"name": "primary_error", "category": "confirmed", "canonical_value": "HTTP 504"},
+        {"name": "root_cause", "category": "decision_current", "canonical_value": "DATABASE_CONNECTION_POOL_EXHAUSTION", "superseded_value": null},
+        {"name": "previous_pool_limit", "category": "confirmed", "canonical_value": "50"},
+        {"name": "temporary_pool_limit", "category": "decision_current", "canonical_value": "100", "superseded_value": "50"},
+        {"name": "incident_owner", "category": "confirmed", "canonical_value": "Platform Team"},
+        {"name": "permanent_fix_deployed", "category": "open_issue", "canonical_value": "NO"},
+        {"name": "permanent_fix_deployment_date", "category": "unresolved", "canonical_value": null}
+      ],
+      "known_fact_violation_checks": [
+        {"check_id": "permanent_fix_marked_deployed", "description": "Summary states the permanent fix has been deployed instead of still pending."},
+        {"check_id": "deployment_date_invented", "description": "Summary invents a concrete permanent-fix deployment date when none was stated."},
+        {"check_id": "rejected_hypothesis_as_root_cause", "description": "Summary presents the rejected memory-leak or network-partition hypothesis as the confirmed root cause."},
+        {"check_id": "temporary_mitigation_as_permanent", "description": "Summary describes the temporary pool-limit mitigation as a permanent remediation."}
+      ]
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "version": "v1",
+  "questions": {
+    "customer_support_001": [
+      {
+        "question_id": "q1_order_id",
+        "question": "What is the customer's order ID?",
+        "expected_answer": "ORD-74291",
+        "answer_type": "exact_identifier",
+        "allowed_enum_values": null
+      },
+      {
+        "question_id": "q2_latest_preference",
+        "question": "What is the customer's latest delivery time preference?",
+        "expected_answer": "AFTERNOON",
+        "answer_type": "enum",
+        "allowed_enum_values": ["MORNING", "AFTERNOON"]
+      },
+      {
+        "question_id": "q3_latest_delivery_date",
+        "question": "What is the latest confirmed delivery date?",
+        "expected_answer": "2026-11-05",
+        "answer_type": "iso_date",
+        "allowed_enum_values": null
+      },
+      {
+        "question_id": "q4_tracking_number",
+        "question": "What is the tracking number for this order?",
+        "expected_answer": "NOT_STATED",
+        "answer_type": "unknown",
+        "allowed_enum_values": null
+      }
+    ],
+    "technical_incident_001": [
+      {
+        "question_id": "q1_incident_id",
+        "question": "What is the incident ID?",
+        "expected_answer": "INC-2084",
+        "answer_type": "exact_identifier",
+        "allowed_enum_values": null
+      },
+      {
+        "question_id": "q2_root_cause",
+        "question": "What was the confirmed root cause of the incident?",
+        "expected_answer": "DATABASE_CONNECTION_POOL_EXHAUSTION",
+        "answer_type": "enum",
+        "allowed_enum_values": ["DATABASE_CONNECTION_POOL_EXHAUSTION", "MEMORY_LEAK", "NETWORK_PARTITION"]
+      },
+      {
+        "question_id": "q3_temporary_pool_limit",
+        "question": "What was the new connection pool limit used for temporary mitigation?",
+        "expected_answer": "100",
+        "answer_type": "integer",
+        "allowed_enum_values": null
+      },
+      {
+        "question_id": "q4_permanent_fix_date",
+        "question": "What is the confirmed deployment date of the permanent fix?",
+        "expected_answer": "NOT_STATED",
+        "answer_type": "unknown",
+        "allowed_enum_values": null
+      }
+    ]
+  }
+}

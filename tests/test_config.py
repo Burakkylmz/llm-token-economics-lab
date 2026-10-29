@@ -679,3 +679,192 @@ def test_lab07_unknown_key_rejected(tmp_path):
     broken = VALID_TOML + "\n[lab07]\nnot_a_real_key = 1\n"
     with pytest.raises(ConfigError):
         load_config(_write(tmp_path, broken))
+
+
+# --- lab08: optional section, backward compatibility -----------------------
+
+
+def test_lab08_section_absent_still_gets_documented_defaults(tmp_path):
+    config = load_config(_write(tmp_path, VALID_TOML))
+    lab08 = config.lab08
+    assert lab08.enabled is True
+    assert lab08.model == "openai/gpt-oss-20b"
+    assert lab08.default_profile == "default"
+    assert lab08.concurrency_levels == (1, 5)
+    assert lab08.repetitions == 1
+    assert lab08.reasoning_effort == "low"
+    assert lab08.max_allowed_concurrency == 10
+    assert lab08.sdk_max_retries == 0
+    assert lab08.max_api_calls == 32
+    assert lab08.max_estimated_cost_usd == 0.05
+
+
+def test_lab08_section_present_overrides_defaults(tmp_path):
+    toml = VALID_TOML + """
+[lab08]
+enabled = true
+model = "openai/gpt-oss-120b"
+default_profile = "pilot"
+concurrency_levels = [1, 2, 4]
+repetitions = 2
+reasoning_effort = "medium"
+max_completion_tokens = 128
+randomize_condition_order = true
+randomization_seed = 7
+max_allowed_concurrency = 8
+sdk_max_retries = 1
+max_api_calls = 16
+max_estimated_cost_usd = 0.02
+"""
+    config = load_config(_write(tmp_path, toml))
+    lab08 = config.lab08
+    assert lab08.default_profile == "pilot"
+    assert lab08.concurrency_levels == (1, 2, 4)
+    assert lab08.repetitions == 2
+    assert lab08.reasoning_effort == "medium"
+    assert lab08.sdk_max_retries == 1
+
+
+def test_lab08_invalid_profile_rejected(tmp_path):
+    broken = VALID_TOML + '\n[lab08]\ndefault_profile = "nonexistent"\n'
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab08_zero_concurrency_level_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab08]\nconcurrency_levels = [0, 5]\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab08_duplicate_concurrency_levels_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab08]\nconcurrency_levels = [1, 1, 5]\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab08_concurrency_exceeding_max_allowed_concurrency_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab08]\nconcurrency_levels = [1, 20]\nmax_allowed_concurrency = 10\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab08_unsupported_reasoning_effort_rejected(tmp_path):
+    broken = VALID_TOML + '\n[lab08]\nreasoning_effort = "extreme"\n'
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab08_negative_sdk_max_retries_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab08]\nsdk_max_retries = -1\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab08_unknown_key_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab08]\nnot_a_real_key = 1\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab08_negative_max_estimated_cost_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab08]\nmax_estimated_cost_usd = -0.5\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+# --- lab10: optional section, backward compatibility -----------------------
+
+
+def test_lab10_section_absent_still_gets_documented_defaults(tmp_path):
+    config = load_config(_write(tmp_path, VALID_TOML))
+    lab10 = config.lab10
+    assert lab10.enabled is True
+    assert lab10.model == "openai/gpt-oss-20b"
+    assert lab10.default_profile == "default"
+    assert lab10.dataset_version == "v1"
+    assert lab10.summarization_max_completion_tokens == 1536
+    assert lab10.answering_reasoning_effort == "low"
+    assert lab10.answering_max_completion_tokens == 256
+    assert lab10.persist_synthetic_io is True
+    assert lab10.show_all_io_in_terminal is False
+    assert lab10.max_api_calls == 28
+    assert lab10.max_estimated_cost_usd == 0.10
+
+
+def test_lab10_section_present_overrides_defaults(tmp_path):
+    toml = VALID_TOML + """
+[lab10]
+enabled = true
+model = "openai/gpt-oss-120b"
+default_profile = "pilot"
+dataset_version = "v1"
+summarization_max_completion_tokens = 2048
+answering_reasoning_effort = "medium"
+answering_max_completion_tokens = 512
+persist_synthetic_io = false
+show_all_io_in_terminal = true
+max_api_calls = 8
+max_estimated_cost_usd = 0.02
+"""
+    config = load_config(_write(tmp_path, toml))
+    lab10 = config.lab10
+    assert lab10.default_profile == "pilot"
+    assert lab10.summarization_max_completion_tokens == 2048
+    assert lab10.answering_reasoning_effort == "medium"
+    assert lab10.persist_synthetic_io is False
+    assert lab10.max_api_calls == 8
+
+
+def test_lab10_invalid_profile_rejected(tmp_path):
+    broken = VALID_TOML + '\n[lab10]\ndefault_profile = "nonexistent"\n'
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab10_unsupported_reasoning_effort_rejected(tmp_path):
+    broken = VALID_TOML + '\n[lab10]\nanswering_reasoning_effort = "extreme"\n'
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab10_non_positive_summarization_max_completion_tokens_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab10]\nsummarization_max_completion_tokens = 0\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab10_non_positive_answering_max_completion_tokens_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab10]\nanswering_max_completion_tokens = 0\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab10_empty_dataset_version_rejected(tmp_path):
+    broken = VALID_TOML + '\n[lab10]\ndataset_version = ""\n'
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab10_negative_max_api_calls_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab10]\nmax_api_calls = -1\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab10_negative_max_estimated_cost_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab10]\nmax_estimated_cost_usd = -0.5\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab10_unknown_key_rejected(tmp_path):
+    broken = VALID_TOML + "\n[lab10]\nnot_a_real_key = 1\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab10_persist_synthetic_io_must_be_bool(tmp_path):
+    broken = VALID_TOML + '\n[lab10]\npersist_synthetic_io = "yes"\n'
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))

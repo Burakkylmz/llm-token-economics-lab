@@ -6,7 +6,7 @@ requests to the Groq API.
 
 ## Status
 
-**All 9 labs implemented, on top of the shared Stage 0 foundation.**
+**All 10 labs implemented, on top of the shared Stage 0 foundation.**
 Every lab's logic is covered by fully offline unit tests (mocked Groq
 client; no `GROQ_API_KEY` or network needed to run the test suite). Real
 Groq API calls only ever happen when a participant explicitly passes
@@ -27,10 +27,11 @@ exception: it never calls the real API at all, by design).
 | 7 | Lab07 — Rate Limiting & Retry Strategies | Done |
 | 8 | Lab08 — Async Processing & Concurrency | Done |
 | 9 | Lab09 — Batch Processing | Done |
+| 10 | Lab10 — Conversation Summarization & Context Economics | Done |
 
 Run `uv run lab-cli --help` to see all registered labs, or
 `uv run lab-cli <lab_id> --help` for a specific lab's options. See
-`docs/participant/README.md` for per-lab run commands and what to observe.
+`docs/README.md` for per-lab run commands and what to observe.
 
 ## Requirements
 
@@ -112,7 +113,7 @@ directly on the host (see Development, below).
 
 ## Documentation
 
-- Participants: `docs/participant/README.md`
+- Participants: `docs/README.md`
 - Instructors: `docs/instructor/README.md` (includes
   `lab09_sample_batch_result.json`, a pre-captured sample for Lab09 since a
   real Groq Batch API job can take 24h-7d to complete)

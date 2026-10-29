@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from lab_core.cli import build_parser
 
-EXPECTED_LAB_IDS = [f"lab0{i}" for i in range(1, 10)]
+EXPECTED_LAB_IDS = [f"lab0{i}" for i in range(1, 10)] + ["lab10"]
 
 
-def test_all_nine_labs_are_registered():
+def test_all_ten_labs_are_registered():
     parser = build_parser()
     subparsers_action = next(action for action in parser._actions if action.dest == "lab")
     assert sorted(subparsers_action.choices.keys()) == sorted(EXPECTED_LAB_IDS)

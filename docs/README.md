@@ -42,11 +42,11 @@ You don't need Python or `uv` installed at all -- only Docker.
 # 1. Build the image (first time, or after pulling repo changes)
 docker compose build
 
-# 2. Smoke-test: should print the CLI help with all 9 labs listed
+# 2. Smoke-test: should print the CLI help with all 10 labs listed
 docker compose run --rm lab-runner --help
 ```
 
-If step 2 prints the help text with `lab01` through `lab09` listed, the
+If step 2 prints the help text with `lab01` through `lab10` listed, the
 setup is working. Next, run a lab end to end without needing an API key
 yet, to confirm results actually come back out to your machine:
 
@@ -576,6 +576,70 @@ captured result to discuss instead.
 not finish during a class session. See
 `docs/instructor/lab09_sample_batch_result.json` for a pre-captured sample
 to discuss the Batch API's output shape and cost trade-off without waiting.
+
+## Lab10 -- Conversation Summarization & Context Economics
+
+**Objective:** measure whether replacing a long conversation history with
+an LLM-generated summary reduces cumulative token consumption/cost while
+preserving the information needed to answer follow-up questions -- and
+whether `reasoning_effort="medium"` summaries are worth their extra cost
+over `"low"` ones.
+
+**Three conditions** (always all three, same answer model/settings in
+every one): `full_history_baseline` (control, no summary call),
+`summarization_low`, `summarization_medium`. Each summary is generated
+**once** per dataset/effort and reused for every follow-up question in
+that condition -- it is never regenerated per question.
+
+**Two synthetic, versioned golden datasets** (`data/lab10/`):
+`customer_support_001` (a delivery reschedule, a support ticket, a pending
+return, a deliberately unstated tracking number) and
+`technical_incident_001` (two rejected hypotheses before a confirmed root
+cause, a temporary mitigation vs. an undeployed permanent fix).
+
+```
+uv run lab-cli lab10 all --profile pilot --dry-run --config config/default.toml
+uv run lab-cli lab10 all --profile default --dry-run --config config/default.toml
+uv run lab-cli lab10 all --profile extended --dry-run --config config/default.toml
+uv run lab-cli lab10 all --profile default --live --config config/live.toml
+uv run lab-cli lab10 summarize --profile pilot --live --config config/live.toml --experiment-run-id my-summaries
+uv run lab-cli lab10 evaluate --profile pilot --live --config config/live.toml --experiment-run-id my-summaries
+uv run lab-cli lab10 backfill --config config/live.toml
+```
+
+Planned call counts: `pilot` = 8, `default` = 14, `extended` = 28 (formula:
+`3 x questions_per_dataset + 2`, doubled for `extended`'s two datasets).
+
+**Inspecting what actually happened** -- every run writes, under
+`results/lab10_conversation_summarization/<experiment_run_id>/`:
+`original_conversation.json` (the raw source conversation),
+`generated_summaries.json` (the actual structured summary the model
+produced, per dataset/effort), `request_response_inspection.json` (every
+request/response pair, including the exact prompts sent), plus
+`context_comparison.csv`, `token_comparison.csv`, `cost_comparison.csv`,
+`break_even_analysis.csv`, `quality_evaluation.json`, and
+`analysis_report.md`. Pass `--show-io` to also print the full
+request/response trace to the terminal (the default terminal output shows
+only one representative before/after example).
+
+**Interpreting the charts** (`charts/*.png`): context size before/after,
+summary token breakdown (input/reasoning/non-reasoning), cumulative input
+tokens across follow-ups, cumulative cost with the break-even point marked
+(if reached), fact-retention-rate & answer-accuracy side by side, and a
+quality-vs-cost scatter plot. A high compression ratio next to a low
+fact-retention rate is a **failed** summarization strategy, not a
+successful one -- the two are reported separately on purpose.
+
+**Break-even is never extrapolated.** If the summarization strategy's
+cumulative cost never drops below the baseline's within the measured
+follow-up questions, `break_even_status` is reported as `NOT_REACHED` --
+this is a real, honest finding, not a missing feature.
+
+`evaluate` reuses an existing run's `generated_summaries.json` (found via
+`--experiment-run-id`) without ever regenerating the summary; it fails
+clearly if that run has no generated summaries yet. `backfill` recomputes
+every derived report/chart file from already-persisted raw measurements --
+no API calls, ever.
 
 ## Troubleshooting
 

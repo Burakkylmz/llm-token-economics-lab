@@ -37,6 +37,7 @@ def _discover_labs() -> list[tuple[str, LabRegisterFn]]:
         "labs.lab07_rate_limiting.cli",
         "labs.lab08_concurrency.cli",
         "labs.lab09_batch_processing.cli",
+        "labs.lab10_conversation_summarization.cli",
     ]
 
     registry: list[tuple[str, LabRegisterFn]] = []
