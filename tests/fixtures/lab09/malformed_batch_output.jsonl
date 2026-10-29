@@ -1,0 +1,4 @@
+{"custom_id": "task_001", "response": {"status_code": 200, "body": {"usage": {"prompt_tokens": 42, "completion_tokens": 2, "total_tokens": 44}, "choices": [{"message": {"content": "POSITIVE"}}]}}, "error": null}
+{"custom_id": "task_001", "response": {"status_code": 200, "body": {"usage": {"prompt_tokens": 42, "completion_tokens": 2, "total_tokens": 44}, "choices": [{"message": {"content": "POSITIVE"}}]}}, "error": null}
+{"custom_id": "task_999", "response": {"status_code": 200, "body": {"usage": {"prompt_tokens": 10, "completion_tokens": 1, "total_tokens": 11}, "choices": [{"message": {"content": "N/A"}}]}}, "error": null}
+this line is not valid JSON at all

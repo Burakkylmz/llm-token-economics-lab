@@ -1,0 +1,4 @@
+{"custom_id": "task_001", "response": {"status_code": 200, "body": {"usage": {"prompt_tokens": 42, "completion_tokens": 2, "total_tokens": 44}, "choices": [{"message": {"content": "POSITIVE"}}]}}, "error": null}
+{"custom_id": "task_002", "response": {"status_code": 200, "body": {"usage": {"prompt_tokens": 40, "completion_tokens": 2, "total_tokens": 42}, "choices": [{"message": {"content": "NEGATIVE"}}]}}, "error": null}
+{"custom_id": "task_003", "response": {"status_code": 200, "body": {"usage": {"prompt_tokens": 38, "completion_tokens": 3, "total_tokens": 41}, "choices": [{"message": {"content": "ORD-55213"}}]}}, "error": null}
+{"custom_id": "task_004", "response": {"status_code": 200, "body": {"usage": {"prompt_tokens": 36, "completion_tokens": 3, "total_tokens": 39}, "choices": [{"message": {"content": "TKT-9043"}}]}}, "error": null}

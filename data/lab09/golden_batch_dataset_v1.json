@@ -1,0 +1,134 @@
+{
+  "version": "v1",
+  "description": "Synthetic, versioned business-microtask workload for Lab09 (sequential vs concurrent vs Batch API). Every task is independently executable, has a deterministic expected answer, and is evaluated by exact string match or numeric match -- never substring search.",
+  "tasks": [
+    {
+      "task_id": "task_001",
+      "category": "classification_sentiment",
+      "prompt": "Classify the sentiment of this customer review as exactly one word: POSITIVE, NEGATIVE, or NEUTRAL. Review: 'The product arrived on time and works perfectly, I am very happy with it.' Answer with only the single word.",
+      "expected_answer": "POSITIVE",
+      "evaluation_type": "exact_match",
+      "metadata": {"source": "synthetic", "version": "v1"}
+    },
+    {
+      "task_id": "task_002",
+      "category": "classification_sentiment",
+      "prompt": "Classify the sentiment of this customer review as exactly one word: POSITIVE, NEGATIVE, or NEUTRAL. Review: 'The package arrived three days late and the item was damaged.' Answer with only the single word.",
+      "expected_answer": "NEGATIVE",
+      "evaluation_type": "exact_match",
+      "metadata": {"source": "synthetic", "version": "v1"}
+    },
+    {
+      "task_id": "task_003",
+      "category": "extraction_identifier",
+      "prompt": "Extract the order ID from this message and answer with only the order ID, nothing else. Message: 'Hi, I need an update on order ORD-55213, it has not shipped yet.'",
+      "expected_answer": "ORD-55213",
+      "evaluation_type": "exact_match",
+      "metadata": {"source": "synthetic", "version": "v1"}
+    },
+    {
+      "task_id": "task_004",
+      "category": "extraction_identifier",
+      "prompt": "Extract the support ticket number from this message and answer with only the ticket number, nothing else. Message: 'Ticket TKT-9043 was created for your refund request.'",
+      "expected_answer": "TKT-9043",
+      "evaluation_type": "exact_match",
+      "metadata": {"source": "synthetic", "version": "v1"}
+    },
+    {
+      "task_id": "task_005",
+      "category": "arithmetic_business",
+      "prompt": "An invoice has 3 line items priced at 12.50, 7.25, and 4.00 USD. What is the total in USD? Answer with only the number, no currency symbol.",
+      "expected_answer": "23.75",
+      "evaluation_type": "numeric_match",
+      "metadata": {"source": "synthetic", "version": "v1"}
+    },
+    {
+      "task_id": "task_006",
+      "category": "arithmetic_business",
+      "prompt": "A product costs 80 USD and has a 25 percent discount applied. What is the final price in USD? Answer with only the number, no currency symbol.",
+      "expected_answer": "60",
+      "evaluation_type": "numeric_match",
+      "metadata": {"source": "synthetic", "version": "v1"}
+    },
+    {
+      "task_id": "task_007",
+      "category": "boolean_guard",
+      "prompt": "Does this message contain a request for payment via gift cards? Answer with only YES or NO. Message: 'Please send me a $200 Amazon gift card to confirm your account.'",
+      "expected_answer": "YES",
+      "evaluation_type": "exact_match",
+      "metadata": {"source": "synthetic", "version": "v1"}
+    },
+    {
+      "task_id": "task_008",
+      "category": "boolean_guard",
+      "prompt": "Does this message contain a request for payment via gift cards? Answer with only YES or NO. Message: 'Your invoice #4821 is attached for your records.'",
+      "expected_answer": "NO",
+      "evaluation_type": "exact_match",
+      "metadata": {"source": "synthetic", "version": "v1"}
+    },
+    {
+      "task_id": "task_009",
+      "category": "entity_extraction",
+      "prompt": "Extract the email address mentioned in this message and answer with only the email address, nothing else. Message: 'Please send the report to maria.santos@example.com by Friday.'",
+      "expected_answer": "maria.santos@example.com",
+      "evaluation_type": "exact_match",
+      "metadata": {"source": "synthetic", "version": "v1"}
+    },
+    {
+      "task_id": "task_010",
+      "category": "entity_extraction",
+      "prompt": "Extract the delivery date mentioned in this message and answer with only the date in YYYY-MM-DD format. Message: 'Your package is scheduled to arrive on 2026-11-12.'",
+      "expected_answer": "2026-11-12",
+      "evaluation_type": "exact_match",
+      "metadata": {"source": "synthetic", "version": "v1"}
+    },
+    {
+      "task_id": "task_011",
+      "category": "formatting",
+      "prompt": "Convert this price to a plain number with no currency symbol and no commas. Price: $1,250.00. Answer with only the number.",
+      "expected_answer": "1250.00",
+      "evaluation_type": "numeric_match",
+      "metadata": {"source": "synthetic", "version": "v1"}
+    },
+    {
+      "task_id": "task_012",
+      "category": "classification_status",
+      "prompt": "An HTTP response returned status code 404. Classify this as exactly one word: SUCCESS, CLIENT_ERROR, or SERVER_ERROR. Answer with only the word.",
+      "expected_answer": "CLIENT_ERROR",
+      "evaluation_type": "exact_match",
+      "metadata": {"source": "synthetic", "version": "v1"}
+    },
+    {
+      "task_id": "task_013",
+      "category": "classification_priority",
+      "prompt": "Classify the priority of this support ticket as exactly one word: LOW, MEDIUM, or HIGH. Ticket: 'Production payment API is returning errors for all customers.' Answer with only the word.",
+      "expected_answer": "HIGH",
+      "evaluation_type": "exact_match",
+      "metadata": {"source": "synthetic", "version": "v1"}
+    },
+    {
+      "task_id": "task_014",
+      "category": "classification_priority",
+      "prompt": "Classify the priority of this support ticket as exactly one word: LOW, MEDIUM, or HIGH. Ticket: 'Could you update the color of the logo in the footer sometime next quarter?' Answer with only the word.",
+      "expected_answer": "LOW",
+      "evaluation_type": "exact_match",
+      "metadata": {"source": "synthetic", "version": "v1"}
+    },
+    {
+      "task_id": "task_015",
+      "category": "arithmetic_business",
+      "prompt": "A subtotal of 200 USD has 8 percent sales tax applied. What is the total in USD including tax? Answer with only the number, no currency symbol.",
+      "expected_answer": "216",
+      "evaluation_type": "numeric_match",
+      "metadata": {"source": "synthetic", "version": "v1"}
+    },
+    {
+      "task_id": "task_016",
+      "category": "entity_extraction",
+      "prompt": "Extract the phone number mentioned in this message and answer with only the phone number, including any dashes. Message: 'You can reach support at 1-800-555-0199 anytime.'",
+      "expected_answer": "1-800-555-0199",
+      "evaluation_type": "exact_match",
+      "metadata": {"source": "synthetic", "version": "v1"}
+    }
+  ]
+}

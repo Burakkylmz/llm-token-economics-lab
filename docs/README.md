@@ -553,29 +553,40 @@ but not necessarily per-call latency.
 
 ## Lab09 -- Batch Processing
 
-**Objective:** contrast three distinct concepts: synchronous requests,
-Python-level async/concurrent requests, and the provider-managed Groq
-Batch API.
+**Objective:** contrast three distinct execution strategies over the SAME
+golden business-microtask dataset: sequential requests, Python-level
+async/concurrent requests, and the provider-managed Groq Batch API (50%
+cheaper, but deferred). Full write-up, hypotheses (H1-H5), the
+golden-dataset profile table, and every CLI command: see
+`docs/lab09-batch-processing-and-asynchronous-workflows.md` (Turkish).
 
 ```
-uv run lab-cli lab09 sequential --live --config config/live.toml
-uv run lab-cli lab09 async --live --config config/live.toml
-uv run lab-cli lab09 prepare_batch_input --config config/live.toml   # no --live needed, pure local file write
-uv run lab-cli lab09 submit_batch --live --config config/live.toml   # submits only; does NOT wait
-uv run lab-cli lab09 check_batch_status --live --config config/live.toml --batch-id <id>
-uv run lab-cli lab09 fetch_batch_results --live --config config/live.toml --output-file-id <id>
+uv run lab-cli lab09 all --profile default --dry-run --config config/default.toml
+uv run lab-cli lab09 all --profile default --live --experiment-run-id my-run --config config/live.toml
+uv run lab-cli lab09 submit_batch --experiment-run-id my-run --live --config config/live.toml   # submits only; does NOT wait
+uv run lab-cli lab09 check_batch_status --experiment-run-id my-run --live --config config/live.toml
+uv run lab-cli lab09 fetch_batch_results --experiment-run-id my-run --live --config config/live.toml
+uv run lab-cli lab09 evaluate --experiment-run-id my-run --config config/default.toml   # offline, no API calls
+uv run lab-cli lab09 backfill --run-id my-run --config config/default.toml             # offline chart regen
 ```
+
+The Batch job is NEVER auto-submitted by `all` -- submission is always a
+separate, explicit command, since it starts a deferred job that may
+complete long after the terminal command returns.
 
 **Note:** on at least one real Groq account, `submit_batch` returned a real
 `403 Permission Denied: Not available for your plan` -- the Batch API is
 not enabled for every plan tier. If you hit this, it's an account
-limitation, not a bug in this lab; ask your instructor for a sample
-captured result to discuss instead.
+limitation, not a bug in this lab -- use the fully offline fixture-driven
+workflow instead (`tests/fixtures/lab09/`, documented in the per-lab
+guide's "Tamamen offline eğitim modu" section), which exercises the whole
+reconciliation/evaluation/pricing/chart pipeline with no API key at all.
 
 **A real batch job's completion window is 24 hours to 7 days** -- it will
-not finish during a class session. See
-`docs/instructor/lab09_sample_batch_result.json` for a pre-captured sample
-to discuss the Batch API's output shape and cost trade-off without waiting.
+not finish during a class session. Use the offline fixtures above, or see
+`docs/instructor/lab09_sample_batch_result.json` for a pre-captured live
+sample to discuss the Batch API's output shape and cost trade-off without
+waiting.
 
 ## Lab10 -- Conversation Summarization & Context Economics
 

@@ -868,3 +868,108 @@ def test_lab10_persist_synthetic_io_must_be_bool(tmp_path):
     broken = VALID_TOML + '\n[lab10]\npersist_synthetic_io = "yes"\n'
     with pytest.raises(ConfigError):
         load_config(_write(tmp_path, broken))
+
+
+# --- lab09: expanded (2.0) section, backward compatibility -----------------
+# VALID_TOML already carries the pre-2.0 `[lab09]\nbatch_completion_window =
+# "24h"` section (every other lab's tests append their own [labXX] section
+# to VALID_TOML, which has none of their own) -- so these tests use a base
+# with that section stripped out, to append a full replacement [lab09]
+# block without tomllib raising a duplicate-table error.
+
+_BASE_TOML_NO_LAB09 = VALID_TOML.replace('[lab09]\nbatch_completion_window = "24h"\n', "")
+
+
+def test_lab09_section_absent_still_gets_documented_defaults(tmp_path):
+    config = load_config(_write(tmp_path, _BASE_TOML_NO_LAB09))
+    lab09 = config.lab09
+    assert lab09.enabled is True
+    assert lab09.model == "openai/gpt-oss-20b"
+    assert lab09.default_profile == "default"
+    assert lab09.dataset_version == "v1"
+    assert lab09.reasoning_effort == "low"
+    assert lab09.max_completion_tokens == 128
+    assert lab09.max_concurrent_requests == 5
+    assert lab09.sdk_max_retries == 0
+    assert lab09.batch_completion_window == "24h"
+    assert lab09.max_api_calls == 32
+    assert lab09.max_estimated_cost_usd == 0.05
+    assert lab09.max_batch_input_requests == 16
+
+
+def test_lab09_pre_2_0_section_with_only_batch_completion_window_still_loads(tmp_path):
+    """A config file written before the 2.0 expansion -- containing only the
+    original single key -- must keep loading with every other field
+    defaulted, never raising ConfigError."""
+    config = load_config(_write(tmp_path, VALID_TOML))
+    lab09 = config.lab09
+    assert lab09.batch_completion_window == "24h"
+    assert lab09.default_profile == "default"
+    assert lab09.max_api_calls == 32
+
+
+def test_lab09_section_present_overrides_defaults(tmp_path):
+    toml = _BASE_TOML_NO_LAB09 + """
+[lab09]
+enabled = true
+model = "openai/gpt-oss-120b"
+default_profile = "pilot"
+dataset_version = "v1"
+reasoning_effort = "medium"
+max_completion_tokens = 256
+max_concurrent_requests = 3
+sdk_max_retries = 1
+batch_completion_window = "7d"
+max_api_calls = 8
+max_estimated_cost_usd = 0.02
+max_batch_input_requests = 4
+"""
+    config = load_config(_write(tmp_path, toml))
+    lab09 = config.lab09
+    assert lab09.default_profile == "pilot"
+    assert lab09.reasoning_effort == "medium"
+    assert lab09.max_concurrent_requests == 3
+    assert lab09.batch_completion_window == "7d"
+    assert lab09.max_batch_input_requests == 4
+
+
+def test_lab09_invalid_profile_rejected(tmp_path):
+    broken = _BASE_TOML_NO_LAB09 + '\n[lab09]\ndefault_profile = "nonexistent"\n'
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab09_unsupported_reasoning_effort_rejected(tmp_path):
+    broken = _BASE_TOML_NO_LAB09 + '\n[lab09]\nreasoning_effort = "extreme"\n'
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab09_zero_max_concurrent_requests_rejected(tmp_path):
+    broken = _BASE_TOML_NO_LAB09 + "\n[lab09]\nmax_concurrent_requests = 0\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab09_negative_sdk_max_retries_rejected(tmp_path):
+    broken = _BASE_TOML_NO_LAB09 + "\n[lab09]\nsdk_max_retries = -1\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab09_unknown_key_rejected(tmp_path):
+    broken = _BASE_TOML_NO_LAB09 + "\n[lab09]\nnot_a_real_key = 1\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab09_negative_max_estimated_cost_rejected(tmp_path):
+    broken = _BASE_TOML_NO_LAB09 + "\n[lab09]\nmax_estimated_cost_usd = -0.5\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))
+
+
+def test_lab09_zero_max_batch_input_requests_rejected(tmp_path):
+    broken = _BASE_TOML_NO_LAB09 + "\n[lab09]\nmax_batch_input_requests = 0\n"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, broken))

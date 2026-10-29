@@ -219,7 +219,38 @@ class Lab08Config:
 
 @dataclass(frozen=True)
 class Lab09Config:
+    """Lab09's sequential-vs-concurrent-vs-Batch-API processing experiment.
+
+    Entirely optional at the AppConfig level (same pattern as Lab08Config/
+    Lab10Config): `lab09 all --live` must keep working with its documented
+    16-call default (8 tasks x 2 real-time conditions) even for a config
+    that predates this expanded section. A config file's OLD
+    `batch_completion_window`-only `[lab09]` section (pre-2.0) still loads
+    fine -- every other field below has a safe, documented default.
+    """
+
+    enabled: bool
+    model: str
+    default_profile: str
+    dataset_version: str
+    reasoning_effort: str
+    max_completion_tokens: int
+    # Concurrency level used by the "concurrent" real-time condition --
+    # always a single fixed value (unlike Lab08's swept concurrency_levels),
+    # since Lab09's independent variable is the EXECUTION MECHANISM
+    # (sequential vs concurrent vs batch), not concurrency level itself.
+    max_concurrent_requests: int
+    # This lab's OWN AsyncGroq client is constructed with this
+    # max_retries value (default 0) so the SDK's hidden automatic retries
+    # never inflate measured latency/attempt counts.
+    sdk_max_retries: int
     batch_completion_window: str
+    max_api_calls: Optional[int]
+    max_estimated_cost_usd: Optional[float]
+    # A separate, smaller guard on Batch INPUT requests (never real-time
+    # API calls -- see labs.lab09_batch_processing.datasets module
+    # docstring on why these two counts must never be confused).
+    max_batch_input_requests: Optional[int]
 
 
 # openai/gpt-oss-20b and openai/gpt-oss-120b (this project's default/pricing
@@ -1185,10 +1216,113 @@ def _build_lab08(raw: dict) -> Lab08Config:
     )
 
 
+LAB09_PROFILES = ("pilot", "default", "extended")
+
+
 def _build_lab09(raw: dict) -> Lab09Config:
+    """Optional [lab09] section with safe, documented defaults: 8 tasks x
+    2 real-time conditions (sequential, concurrent) = 16 planned real-time
+    calls by default, plus 8 Batch input requests -- matching this
+    project's documented default experiment matrix (spec Part 5's table).
+    A config file that omits [lab09] entirely, or has only the pre-2.0
+    `batch_completion_window` key, gets exactly these defaults for
+    everything else.
+    """
     section = raw.get("lab09", {})
+
+    enabled = section.get("enabled", True)
+    if not isinstance(enabled, bool):
+        raise ConfigError("lab09.enabled must be a boolean")
+
+    model = str(section.get("model", "openai/gpt-oss-20b"))
+
+    default_profile = section.get("default_profile", "default")
+    if default_profile not in LAB09_PROFILES:
+        raise ConfigError(f"lab09.default_profile must be one of {LAB09_PROFILES}")
+
+    dataset_version = str(section.get("dataset_version", "v1"))
+
+    reasoning_effort = section.get("reasoning_effort", "low")
+    if reasoning_effort not in SUPPORTED_REASONING_EFFORTS:
+        raise ConfigError(
+            f"lab09.reasoning_effort: unsupported value '{reasoning_effort}' -- "
+            f"this project's models only support {SUPPORTED_REASONING_EFFORTS}"
+        )
+
+    max_completion_tokens = section.get("max_completion_tokens", 128)
+    if (
+        isinstance(max_completion_tokens, bool)
+        or not isinstance(max_completion_tokens, int)
+        or max_completion_tokens < 1
+    ):
+        raise ConfigError("lab09.max_completion_tokens must be a positive integer")
+
+    max_concurrent_requests = section.get("max_concurrent_requests", 5)
+    if (
+        isinstance(max_concurrent_requests, bool)
+        or not isinstance(max_concurrent_requests, int)
+        or max_concurrent_requests < 1
+    ):
+        raise ConfigError("lab09.max_concurrent_requests must be a positive integer")
+
+    sdk_max_retries = section.get("sdk_max_retries", 0)
+    if isinstance(sdk_max_retries, bool) or not isinstance(sdk_max_retries, int) or sdk_max_retries < 0:
+        raise ConfigError("lab09.sdk_max_retries must be a non-negative integer")
+
+    batch_completion_window = str(section.get("batch_completion_window", "24h"))
+
+    # Extended profile's real-time ceiling: 16 tasks x 2 conditions = 32 calls.
+    max_api_calls = section.get("max_api_calls", 32)
+    if max_api_calls is not None:
+        if isinstance(max_api_calls, bool) or not isinstance(max_api_calls, int) or max_api_calls < 1:
+            raise ConfigError("lab09.max_api_calls must be a positive integer or omitted")
+
+    # Worst case at the 32-call extended ceiling: 32 x 128
+    # max_completion_tokens x $0.30/1e6 (gpt-oss-20b output price) =
+    # $0.00123, plus a negligible prompt-token share. $0.05 leaves
+    # generous headroom while still being a real, enforced cap.
+    max_estimated_cost_usd = section.get("max_estimated_cost_usd", 0.05)
+    if max_estimated_cost_usd is not None:
+        if (
+            isinstance(max_estimated_cost_usd, bool)
+            or not isinstance(max_estimated_cost_usd, (int, float))
+            or max_estimated_cost_usd <= 0
+        ):
+            raise ConfigError("lab09.max_estimated_cost_usd must be a positive number or omitted")
+        max_estimated_cost_usd = float(max_estimated_cost_usd)
+
+    # Extended profile's Batch input ceiling: 16 requests.
+    max_batch_input_requests = section.get("max_batch_input_requests", 16)
+    if max_batch_input_requests is not None:
+        if (
+            isinstance(max_batch_input_requests, bool)
+            or not isinstance(max_batch_input_requests, int)
+            or max_batch_input_requests < 1
+        ):
+            raise ConfigError("lab09.max_batch_input_requests must be a positive integer or omitted")
+
+    known_keys = {
+        "enabled", "model", "default_profile", "dataset_version", "reasoning_effort", "max_completion_tokens",
+        "max_concurrent_requests", "sdk_max_retries", "batch_completion_window", "max_api_calls",
+        "max_estimated_cost_usd", "max_batch_input_requests",
+    }
+    unknown_keys = set(section.keys()) - known_keys
+    if unknown_keys:
+        raise ConfigError(f"lab09 has unknown configuration key(s): {sorted(unknown_keys)}")
+
     return Lab09Config(
-        batch_completion_window=str(_require(section, "batch_completion_window", "lab09")),
+        enabled=enabled,
+        model=model,
+        default_profile=default_profile,
+        dataset_version=dataset_version,
+        reasoning_effort=reasoning_effort,
+        max_completion_tokens=max_completion_tokens,
+        max_concurrent_requests=max_concurrent_requests,
+        sdk_max_retries=sdk_max_retries,
+        batch_completion_window=batch_completion_window,
+        max_api_calls=max_api_calls,
+        max_estimated_cost_usd=max_estimated_cost_usd,
+        max_batch_input_requests=max_batch_input_requests,
     )
 
 

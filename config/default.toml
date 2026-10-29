@@ -176,7 +176,66 @@ max_estimated_cost_usd = 0.05
 cache_probe_calls = 3
 
 [lab09]
+# Lab09's sequential-vs-concurrent-vs-Batch-API processing experiment.
+# Entirely optional (see lab_core.config._build_lab09): a config file that
+# omits [lab09] entirely, or has only the pre-2.0 batch_completion_window
+# key, gets exactly these defaults, matching this project's documented
+# default experiment matrix: 8 tasks x 2 real-time conditions (sequential,
+# concurrent) = 16 planned real-time calls, plus 8 Batch input requests
+# (NOT 8 additional real-time calls -- see labs.lab09_batch_processing
+# .datasets module docstring).
+enabled = true
+model = "openai/gpt-oss-20b"
+
+# "pilot" (4 tasks: 8 real-time calls, 4 batch requests) / "default" (8
+# tasks: 16 real-time calls, 8 batch requests) / "extended" (16 tasks: 32
+# real-time calls, 16 batch requests). Override with --profile.
+default_profile = "default"
+dataset_version = "v1"
+
+# openai/gpt-oss-20b/120b only support these three reasoning_effort
+# levels (see SUPPORTED_REASONING_EFFORTS above). The SAME value is used
+# across sequential, concurrent, AND batch -- the only controlled
+# variable this experiment varies is the execution mechanism.
+reasoning_effort = "low"
+
+# Generous enough that a short, strictly-formatted classification/
+# extraction answer is never truncated by its own reasoning overhead;
+# finish_reason="length" is still recorded on every call so truncation
+# stays visible if it happens.
+max_completion_tokens = 128
+
+# The single concurrency level used by the "concurrent" real-time
+# condition -- a safe, modest default (spec Part 11), not a swept
+# parameter like Lab08's concurrency_levels.
+max_concurrent_requests = 5
+
+# This lab's OWN AsyncGroq client is constructed with max_retries=0 so
+# the SDK's own hidden automatic retries never inflate measured latency
+# or attempt counts. Never applied to any other lab's shared client.
+sdk_max_retries = 0
+
+# Groq recommends the longer completion window to reduce the chance of
+# expired jobs (console.groq.com/docs/batch, verified 2026-10-29).
 batch_completion_window = "24h"
+
+# Request-count safety net for REAL-TIME calls only: exactly this
+# project's documented Extended Experiment ceiling (16 tasks x 2
+# conditions = 32 calls). A --profile override that would push the
+# real-time plan above this is refused before any API call.
+max_api_calls = 32
+
+# Cost safety net, derived from this file's own [pricing] and
+# max_completion_tokens above: worst case at the 32-call extended
+# ceiling is 32 x 128 x $0.30/1e6 (gpt-oss-20b output price) = $0.00123,
+# plus a negligible prompt-token share. $0.05 leaves generous headroom
+# while still being a real, enforced cap.
+max_estimated_cost_usd = 0.05
+
+# A SEPARATE, smaller guard on Batch INPUT requests (a Batch job with 16
+# input requests is not 16 real-time API calls, but it is still a real
+# job with real eventual cost -- guarded independently of max_api_calls).
+max_batch_input_requests = 16
 
 [lab08]
 # Lab08's sequential-vs-concurrent async execution experiment. Entirely
