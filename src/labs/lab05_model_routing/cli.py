@@ -254,7 +254,7 @@ def _run(args: argparse.Namespace) -> None:
         per_call_cost_ceiling=per_call_ceiling,
     )
 
-    manifest = build_initial_manifest(experiment_run_id, lab05_config, profile, total_planned)
+    manifest = build_initial_manifest(experiment_run_id, lab05_config, profile, total_planned, ctx.config.pricing)
     write_manifest(run_dir, manifest)
     write_experiment_plan_csv(run_dir, plan)
 

@@ -17,6 +17,7 @@ from typing import Optional
 
 from lab_core.config import ModelPricing
 from lab_core.metrics import TokenCostMetrics
+from labs.lab01_token_anatomy.cost import calculate_cost
 
 PRICING_SOURCE = "https://console.groq.com/docs/batch"
 PRICING_VERIFIED_DATE = "2026-10-29"
@@ -39,15 +40,7 @@ class PricingComparison:
 def calculate_standard_cost(tokens: TokenCostMetrics, pricing: ModelPricing) -> Optional[float]:
     """Standard (real-time) pricing, including the caching discount when
     cached_tokens is reported -- identical to labs.lab01_token_anatomy.cost.calculate_cost."""
-    if tokens.prompt_tokens is None or tokens.completion_tokens is None:
-        return None
-    cached = tokens.cached_tokens or 0
-    uncached_prompt_tokens = tokens.prompt_tokens - cached
-    return (
-        uncached_prompt_tokens / 1_000_000 * pricing.input_per_1m_usd
-        + cached / 1_000_000 * pricing.cached_input_per_1m_usd
-        + tokens.completion_tokens / 1_000_000 * pricing.output_per_1m_usd
-    )
+    return calculate_cost(tokens, pricing)
 
 
 def calculate_batch_cost(prompt_tokens: Optional[int], completion_tokens: Optional[int], pricing: ModelPricing) -> Optional[float]:

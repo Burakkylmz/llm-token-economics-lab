@@ -85,10 +85,24 @@ def read_manifest(run_dir: Path) -> Optional[dict]:
         return json.load(f)
 
 
-def build_initial_manifest(experiment_run_id: str, config: Lab05Config, profile: str, planned_calls: int) -> dict:
+def build_initial_manifest(
+    experiment_run_id: str,
+    config: Lab05Config,
+    profile: str,
+    planned_calls: int,
+    pricing_by_model: Optional[dict] = None,
+) -> dict:
+    # Snapshot the prices used at execution time so later re-pricing changes
+    # do not silently alter the interpretation of this historical run.
+    pricing = pricing_by_model or {}
+    pricing_snapshot = {
+        model: asdict(pricing[model]) if model in pricing else None
+        for model in dict.fromkeys((config.small_model, config.large_model))
+    }
     return {
         "experiment_run_id": experiment_run_id,
         "experiment_configuration": asdict(config),
+        "pricing_snapshot": pricing_snapshot,
         "profile": profile,
         "provider": "groq",
         "planned_calls": planned_calls,

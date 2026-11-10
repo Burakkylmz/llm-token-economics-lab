@@ -19,7 +19,16 @@ def calculate_cost(tokens: TokenCostMetrics, pricing: ModelPricing) -> Optional[
     if tokens.prompt_tokens is None or tokens.completion_tokens is None:
         return None
 
-    cached = tokens.cached_tokens or 0
+    # Invalid provider usage must not generate negative or otherwise
+    # misleading price estimates. A missing cache field is different from
+    # an explicitly reported zero; for the total-cost estimate we retain
+    # the documented conservative uncached-input pricing assumption.
+    if tokens.prompt_tokens < 0 or tokens.completion_tokens < 0:
+        return None
+    if tokens.cached_tokens is not None and not 0 <= tokens.cached_tokens <= tokens.prompt_tokens:
+        return None
+
+    cached = tokens.cached_tokens if tokens.cached_tokens is not None else 0
     uncached_prompt_tokens = tokens.prompt_tokens - cached
 
     return (

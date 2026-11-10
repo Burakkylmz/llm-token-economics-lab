@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from labs.lab08_concurrency.charts import generate_concurrency_charts
 from labs.lab08_concurrency.legacy_charts import generate_legacy_concurrency_charts
 
@@ -75,6 +77,10 @@ def test_generate_concurrency_charts_does_not_crash_on_zero_cost_conditions(tmp_
     assert len(written) == 9
 
 
+@pytest.mark.skipif(
+    not (REAL_LEGACY_RESULTS_DIR / "lab08_concurrency.json").exists(),
+    reason="Optional local historical results are not version controlled",
+)
 def test_legacy_backfill_against_real_preexisting_results_file():
     # results/lab08_concurrency.json is the project's real, pre-existing
     # flat legacy file -- confirming the backfill reads real historical

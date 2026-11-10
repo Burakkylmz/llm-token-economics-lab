@@ -48,7 +48,7 @@ def _make_fake_groq_class():
     completions = _FakeCompletions()
 
     class _FakeClient:
-        def __init__(self, api_key=None):
+        def __init__(self, api_key=None, timeout=None, max_retries=None):
             self.api_key = api_key
             self.chat = SimpleNamespace(completions=completions)
 
@@ -348,7 +348,7 @@ def test_one_failed_followup_is_recorded_without_losing_others(monkeypatch, tmp_
     completions.create = _create
 
     class _FakeClient:
-        def __init__(self, api_key=None):
+        def __init__(self, api_key=None, timeout=None, max_retries=None):
             self.chat = SimpleNamespace(completions=completions)
 
     monkeypatch.setattr("lab_core.lab_cli_support.Groq", _FakeClient)

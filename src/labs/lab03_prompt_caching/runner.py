@@ -27,11 +27,8 @@ from typing import Optional
 from groq import Groq
 
 from lab_core.config import ModelPricing, RetryConfig
-from labs.lab01_token_anatomy.factorial_runner import (  # noqa: F401 -- re-exported for callers
-    Budget,
-    call_with_operational_retry,
-    conservative_per_call_cost_ceiling,
-)
+from lab_core.budget import Budget, conservative_per_call_cost_ceiling  # noqa: F401 -- re-exported
+from lab_core.operational_retry import call_with_operational_retry  # noqa: F401 -- re-exported
 from labs.lab01_token_anatomy.observability import compute_non_reasoning_completion_tokens
 from labs.lab02_context_growth.evaluation import evaluate_integer_answer
 from labs.lab03_prompt_caching.cache_cost import compute_cache_cost_breakdown

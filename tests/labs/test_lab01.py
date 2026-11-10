@@ -355,3 +355,23 @@ def test_csv_serialization_keeps_one_row_per_call_across_experiments(
         rows = list(csv.DictReader(f))
 
     assert len(rows) == 3
+
+
+def test_calculate_cost_rejects_invalid_usage():
+    pricing = _pricing()
+    for tokens in (
+        TokenCostMetrics(prompt_tokens=100, completion_tokens=0, cached_tokens=400),
+        TokenCostMetrics(prompt_tokens=100, completion_tokens=0, cached_tokens=-1),
+        TokenCostMetrics(prompt_tokens=-1, completion_tokens=1),
+        TokenCostMetrics(prompt_tokens=1, completion_tokens=-1),
+    ):
+        assert calculate_cost(tokens, pricing) is None
+
+
+def test_calculate_cost_accepts_valid_cache_boundaries():
+    pricing = _pricing()
+    for cached in (0, 100):
+        assert calculate_cost(
+            TokenCostMetrics(prompt_tokens=100, completion_tokens=1, cached_tokens=cached),
+            pricing,
+        ) is not None

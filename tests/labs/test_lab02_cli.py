@@ -37,7 +37,7 @@ def _make_fake_groq_class(responses):
     completions = _FakeCompletions(responses)
 
     class _FakeClient:
-        def __init__(self, api_key=None):
+        def __init__(self, api_key=None, timeout=None, max_retries=None):
             self.api_key = api_key
             self.chat = _FakeChat(completions)
 

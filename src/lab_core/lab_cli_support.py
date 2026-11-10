@@ -59,8 +59,15 @@ def build_context(requested_live: bool, config_path: Optional[Path] = None) -> L
                 "Live execution requested but GROQ_API_KEY is not set in the environment."
             )
         print(f"[COST WARNING] {config.execution.cost_warning_message}")
-        client = Groq(api_key=api_key)
-        async_client = AsyncGroq(api_key=api_key)
+        # One retry owner: our experiment runners count and time retries explicitly.
+        # Disable SDK retries so they cannot silently multiply HTTP attempts.
+        client_options = {
+            "api_key": api_key,
+            "timeout": config.groq.request_timeout_seconds,
+            "max_retries": 0,
+        }
+        client = Groq(**client_options)
+        async_client = AsyncGroq(**client_options)
 
     return LabContext(
         config=config,

@@ -47,7 +47,7 @@ def compute_uncached_prompt_tokens(prompt_tokens: Optional[int], cached_tokens: 
     if prompt_tokens is None or cached_tokens is None:
         return None
     uncached = prompt_tokens - cached_tokens
-    if uncached < 0:
+    if cached_tokens < 0 or uncached < 0:
         return None
     return uncached
 
@@ -80,8 +80,8 @@ def compute_cache_cost_breakdown(tokens: TokenCostMetrics, pricing: Optional[Mod
 
     uncached = compute_uncached_prompt_tokens(tokens.prompt_tokens, cached)
     if uncached is None:
-        # cached_tokens > prompt_tokens: inconsistent provider data. Never
-        # silently corrected -- every derived savings figure stays None.
+        # cached_tokens outside [0, prompt_tokens]: inconsistent provider data.
+        # Shared cost calculation also returns None for invalid usage.
         return CacheCostBreakdown(total_cost, None, None, None, None)
 
     cost_without_cache = tokens.prompt_tokens / 1_000_000 * pricing.input_per_1m_usd

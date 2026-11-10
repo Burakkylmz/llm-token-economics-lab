@@ -62,9 +62,8 @@ def test_breakdown_none_when_inconsistent_cache_usage():
     breakdown = compute_cache_cost_breakdown(tokens, PRICING)
     assert breakdown.estimated_cache_savings_usd is None
     assert breakdown.estimated_input_cost_without_cache_usd is None
-    # total cost is still whatever calculate_cost (unmodified, shared with every
-    # other lab) computes -- this module never overrides that shared function.
-    assert breakdown.estimated_cost_usd is not None
+    # Invalid cache counts cannot produce a trustworthy total estimate.
+    assert breakdown.estimated_cost_usd is None
 
 
 def test_completion_cost_is_never_discounted_by_caching():

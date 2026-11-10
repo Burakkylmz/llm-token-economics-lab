@@ -56,6 +56,27 @@ def build_analysis_report_markdown(
     lines.append(f"- max_completion_tokens: {config.get('max_completion_tokens')}")
     lines.append(f"- Planned calls: {manifest.get('planned_calls')}")
     lines.append("")
+    prices = manifest.get("pricing_snapshot") or {}
+    if prices:
+        lines.append("### Pricing snapshot (USD per 1 million tokens)")
+        lines.append("")
+        lines.append("| model | input | cached input | output | price verified |")
+        lines.append("|---|---:|---:|---:|---|")
+        for model, price in sorted(prices.items()):
+            if price is None:
+                lines.append(f"| `{model}` | N/A | N/A | N/A | N/A |")
+                continue
+            lines.append(
+                f"| `{model}` | {price['input_per_1m_usd']} | "
+                f"{price['cached_input_per_1m_usd']} | {price['output_per_1m_usd']} | "
+                f"{price['price_verified_date']} |"
+            )
+        lines.append("")
+        lines.append(
+            "These are configuration-time estimates, not provider invoices. "
+            "Prices and availability may have changed since the verification date."
+        )
+        lines.append("")
 
     lines.append("## 2. Total Requests and Successful Measurements")
     lines.append("")

@@ -1,0 +1,24 @@
+name: Offline tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install Python
+        run: uv python install 3.12
+      - name: Install locked dependencies
+        run: uv sync --frozen --group dev
+      - name: Compile dashboard UI
+        run: uv run python -m py_compile dashboard/app.py src/lab_core/dashboard_data.py
+      - name: Run offline tests
+        run: uv run pytest -q
