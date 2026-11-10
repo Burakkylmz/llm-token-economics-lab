@@ -1,7 +1,42 @@
 services:
+  # Existing one-shot CLI. Explicit `docker compose run --rm lab-runner ...`
+  # remains unchanged; real API execution still needs both live opt-ins.
   lab-runner:
     build: .
     environment:
-      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
     volumes:
       - ./results:/app/results
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    init: true
+    ports:
+      # Loopback-only: not exposed on the public network.
+      - "127.0.0.1:8501:8501"
+    volumes:
+      # UI may view experiment files but cannot modify them.
+      - ./results:/app/results:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,size=128m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      STREAMLIT_SERVER_HEADLESS: "true"
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "from urllib.request import urlopen; assert urlopen('http://127.0.0.1:8501/_stcore/health', timeout=3).status == 200"
+      start_period: 30s
+      interval: 15s
+      timeout: 5s
+      retries: 4
+    restart: unless-stopped
