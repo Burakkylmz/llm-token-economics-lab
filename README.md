@@ -170,6 +170,26 @@ syntax-checks the dashboard entry point. Tests marked
 `@pytest.mark.integration` are excluded by default and require
 separately authorized live access.
 
+## Quality and security checks
+
+On pushes and Pull Requests, GitHub Actions runs:
+
+- The existing **offline pytest** suite.
+- **Ruff** correctness linting and targeted **mypy** type checking.
+- **Coverage** for shared core and lab packages with an initial 65% floor.
+- **Bandit** high-severity/high-confidence static security analysis.
+- A **dependency audit** of the exported locked runtime dependencies.
+  This audit is initially advisory; warnings must be reviewed rather than
+  treated as a passing security assessment.
+
+A coverage XML report is saved as a GitHub Actions artifact.
+No real Groq API calls are made by these checks.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development and review guidance
+and [SECURITY.md](SECURITY.md) for private vulnerability reporting.
+A public software license has **not** yet been selected by the upstream
+maintainers; publishing a `LICENSE` file is a separate owner decision.
+
 ## Collaboration and upstream repository
 
 This repository is developed in collaboration using GitHub forks and
