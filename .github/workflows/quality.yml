@@ -24,8 +24,15 @@ jobs:
         run: uv python install 3.12
       - name: Sync locked dependencies
         run: uv sync --frozen --group dev
-      - name: Ruff (error and correctness rules)
-        run: uvx --from "ruff==0.14.4" ruff check src dashboard tests --select E4,E7,E9,F --output-format github
+      - name: Ruff (repository-wide correctness baseline)
+        run: uvx --from "ruff==0.14.4" ruff check src dashboard tests --output-format github
+      - name: Ruff (strict shared infrastructure and dashboard)
+        run: |
+          uvx --from "ruff==0.14.4" ruff check --isolated \
+            --select E4,E7,E9,F --output-format github \
+            src/lab_core dashboard \
+            tests/test_dashboard_data.py tests/test_dashboard_view.py \
+            tests/test_lab_cli_support.py tests/test_shared_policy.py
       - name: mypy (typed shared infrastructure)
         run: uv run --with "mypy==1.18.2" mypy --follow-imports=skip --ignore-missing-imports --check-untyped-defs src/lab_core/dashboard_view.py src/lab_core/budget.py
 
