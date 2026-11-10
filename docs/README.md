@@ -75,8 +75,7 @@ docker compose run --rm lab-runner lab01 short_prompt --live --config config/liv
 
 ### Validating the Docker setup itself (optional, for troubleshooting)
 
-To confirm the image builds cleanly and the full offline test suite (71
-tests, no API key or network needed) passes *inside the container*:
+To confirm the image builds cleanly and the full offline test suite (no API key or real Groq calls needed) passes *inside the container*:
 
 ```
 docker compose build
