@@ -176,6 +176,9 @@ On pushes and Pull Requests, GitHub Actions runs:
 
 - The existing **offline pytest** suite.
 - **Ruff** correctness linting and targeted **mypy** type checking.
+  Ruff is strict for shared-core/dashboard modules; three pre-existing
+  unused/dead-code diagnostics are temporarily excluded in legacy lab and
+  test code until a behavior-preserving cleanup PR.
 - **Coverage** for shared core and lab packages with an initial 65% floor.
 - **Bandit** high-severity/high-confidence static security analysis.
 - A **dependency audit** of the exported locked runtime dependencies.
