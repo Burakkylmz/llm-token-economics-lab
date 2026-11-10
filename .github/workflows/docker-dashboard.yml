@@ -1,0 +1,57 @@
+name: Docker dashboard smoke test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-dashboard-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compose-smoke:
+    name: Build CLI + dashboard and verify health and shared results
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate compose configuration
+        run: docker compose config --quiet
+      - name: Build independent CLI and dashboard images
+        run: docker compose build lab-runner dashboard
+      - name: Generate offline Lab07 results through existing CLI
+        run: docker compose run --rm lab-runner lab07 all
+      - name: Start dashboard without any API key
+        run: docker compose up -d --no-deps dashboard
+      - name: Verify local health endpoint
+        run: |
+          set -euo pipefail
+          healthy=0
+          for i in $(seq 1 35); do
+            if curl --fail --silent --show-error --max-time 3 \
+              http://127.0.0.1:8501/_stcore/health >/dev/null; then
+              healthy=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$healthy" != "1" ]; then
+            docker compose ps
+            docker compose logs dashboard
+            exit 1
+          fi
+      - name: Assert API isolation and saved Lab07 result visibility
+        run: |
+          docker compose exec -T dashboard python -c "import os; assert not os.getenv('GROQ_API_KEY'), 'Dashboard must not receive Groq credentials'"
+          docker compose exec -T dashboard python -c "from pathlib import Path; from lab_core.dashboard_data import scan_results; rows, warnings = scan_results(Path('/app/results')); assert any(r['lab'] == 'lab07' for r in rows), (len(rows), warnings); print('Visible Lab07 measurements:', len(rows))"
+      - name: Show diagnostics on failure
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs --no-color dashboard
+      - name: Stop services
+        if: always()
+        run: docker compose down --remove-orphans

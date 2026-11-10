@@ -64,14 +64,43 @@ See [the participant guide](docs/README.md) for per-lab commands and
 experiment design, and [the dashboard guide](docs/dashboard.md) for how to
 interpret the graphs.
 
-## Running with Docker
+## Running with Docker Compose
 
-Docker can run the **CLI experiments and tests** without installing Python
-or uv on the host. The Streamlit dashboard is currently launched with
-**uv on the host**, not through the `lab-runner` container.
+Docker Desktop / Docker Engine with Compose can run the **CLI** and
+**Streamlit dashboard** without installing local Python or uv. They are
+separate services sharing the host `results/` directory.
+
+```powershell
+# From the project root; builds images if necessary:
+docker compose up --build -d dashboard
+
+# Open http://localhost:8501 (dashboard runs without an API key)
+# Generate sample data in a separate CLI container (also no API key):
+docker compose run --rm lab-runner lab07 all
+
+# In the browser select "Refresh results", then the "Retry simulator" tab.
+# Check service status and health:
+docker compose ps
+
+# Stop the dashboard:
+docker compose stop dashboard
+```
+
+The dashboard container exposes port **8501 only on 127.0.0.1**, runs as
+a **non-root user**, uses a **read-only root filesystem**, and mounts
+`results/` **read-only**. It receives **no Groq API key** and cannot
+launch experiments. The CLI container retains read/write access to
+`results/` and requires explicit opt-in for live API calls.
+
+If `localhost:8501` is already in use, stop any host-run Streamlit
+process before starting the container. On Windows use Docker Desktop
+with Linux containers. See the [dashboard guide](docs/dashboard.md)
+for troubleshooting and service details.
+
+To run only the original CLI:
 
 ```bash
-docker compose build
+docker compose build lab-runner
 docker compose run --rm lab-runner --help
 docker compose run --rm lab-runner lab07 all
 ```

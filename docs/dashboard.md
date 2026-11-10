@@ -26,6 +26,52 @@ For an API-free example, run this command in another terminal:
 Then click **Refresh saved results** in the sidebar. Lab07 is a simulator,
 so it does not generate actual provider token billing or model-answer quality.
 
+## Docker Compose (no local Python needed)
+
+From the repository root, with Docker Desktop/Engine and Compose:
+
+```powershell
+docker compose up --build -d dashboard
+# Open http://localhost:8501
+docker compose run --rm lab-runner lab07 all
+# In the sidebar, click "Refresh results".
+docker compose ps
+docker compose stop dashboard
+```
+
+The dashboard is built from the dedicated `Dockerfile.dashboard`,
+separately from the existing CLI `Dockerfile`. Streamlit is installed
+**during the image build** at a pinned direct version, rather than being
+downloaded on every startup; the project's core runtime dependencies
+come from the committed `uv.lock`. The Streamlit dependency graph is
+not yet separately transitive-locked, so rebuilding the image at a later
+date can resolve newer indirect dependencies. See the Docker CI smoke
+test for verified build/runtime behavior.
+
+**Security boundaries:** the dashboard receives no `GROQ_API_KEY`
+environment variable, runs as an unprivileged user, mounts the local
+`results/` directory read-only, has a read-only container filesystem
+with ephemeral `/tmp`, and publishes TCP port 8501 on `127.0.0.1`
+only. This is a local development tool, not an authenticated internet
+service. CLI experiments can still write to `results/` via their
+separate container and need explicit live opt-in.
+
+The Compose healthcheck calls Streamlit's local
+`/_stcore/health` endpoint. Run `docker compose ps` to see the
+healthy status or `docker compose logs dashboard` for details.
+
+If Docker reports that port 8501 is already allocated, stop any local
+Streamlit session before starting the Compose service. On Windows,
+Docker Desktop should be running Linux containers.
+
+### API-free smoke test
+
+A dedicated GitHub Actions workflow builds both images, executes Lab07
+in the CLI container, starts the dashboard without provider credentials,
+checks Streamlit's health endpoint and verifies that the read-only
+dashboard sees the generated Lab07 measurements. It never issues live
+Groq requests.
+
 ## Features
 
 - Discover runs from existing per-lab experiment directories.
@@ -55,7 +101,8 @@ so it does not generate actual provider token billing or model-answer quality.
 ## Future work
 
 Paired experiment-level comparisons with uncertainty bands, per-lab specialized
-charts, dashboard UI integration tests and deployment hardening.
+charts, dashboard UI integration tests, full transitive dependency locking
+for the dashboard image, and authenticated deployment hardening.
 
 ## Lab07 simulator comparison
 
