@@ -1,0 +1,88 @@
+name: Production quality gates
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-analysis:
+    name: Ruff lint and targeted type checking
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install Python 3.12
+        run: uv python install 3.12
+      - name: Sync locked dependencies
+        run: uv sync --frozen --group dev
+      - name: Ruff (repository-wide correctness baseline)
+        run: uvx --from "ruff==0.14.4" ruff check src dashboard tests --output-format github
+      - name: Ruff (strict shared infrastructure and dashboard)
+        run: |
+          uvx --from "ruff==0.14.4" ruff check --isolated \
+            --select E4,E7,E9,F --output-format github \
+            src/lab_core dashboard \
+            tests/test_dashboard_data.py tests/test_dashboard_view.py \
+            tests/test_lab_cli_support.py tests/test_shared_policy.py
+      - name: mypy (typed shared infrastructure)
+        run: uv run --with "mypy==1.18.2" mypy --follow-imports=skip --ignore-missing-imports --check-untyped-defs src/lab_core/dashboard_view.py src/lab_core/budget.py
+
+  coverage:
+    name: Unit test coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install Python 3.12
+        run: uv python install 3.12
+      - name: Sync locked dependencies
+        run: uv sync --frozen --group dev
+      - name: Run offline suite with coverage
+        run: |
+          uv run --with "pytest-cov==6.2.1" pytest -q \
+            --cov=lab_core --cov=labs \
+            --cov-report=term-missing:skip-covered \
+            --cov-report=xml:coverage.xml \
+            --cov-fail-under=65
+      - name: Save coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: ignore
+          retention-days: 14
+
+  security:
+    name: Static security and dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install Python 3.12
+        run: uv python install 3.12
+      - name: Bandit high-severity static audit
+        run: uvx --from "bandit==1.8.6" bandit -r src dashboard --severity-level high --confidence-level high --quiet
+      - name: Export locked runtime dependencies
+        run: uv export --frozen --no-dev --no-emit-project --no-hashes --format requirements-txt --output-file requirements-audit.txt
+      - name: Audit pinned dependencies (advisory during rollout)
+        id: dependency_audit
+        continue-on-error: true
+        run: uvx --from "pip-audit==2.9.0" pip-audit --no-deps --disable-pip --requirement requirements-audit.txt
+      - name: Flag advisory audit failures
+        if: steps.dependency_audit.outcome == 'failure'
+        run: |
+          echo "::warning::Dependency audit found an issue or could not complete. Review the previous step; this scan is advisory until the lockfile has been remediated."
