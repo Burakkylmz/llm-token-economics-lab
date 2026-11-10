@@ -23,7 +23,8 @@ Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 ```bash
 uv sync --frozen --group dev
 uv run pytest -q
-uvx --from "ruff==0.14.4" ruff check src dashboard tests --select E4,E7,E9,F
+uvx --from "ruff==0.14.4" ruff check src dashboard tests
+uvx --from "ruff==0.14.4" ruff check --isolated --select E4,E7,E9,F src/lab_core dashboard tests/test_dashboard_data.py tests/test_dashboard_view.py tests/test_lab_cli_support.py tests/test_shared_policy.py
 uv run --with "mypy==1.18.2" mypy --follow-imports=skip --ignore-missing-imports --check-untyped-defs src/lab_core/dashboard_view.py src/lab_core/budget.py
 uv run --with "pytest-cov==6.2.1" pytest -q --cov=lab_core --cov=labs --cov-report=term-missing --cov-fail-under=65
 uvx --from "bandit==1.8.6" bandit -r src dashboard --severity-level high --confidence-level high --quiet
