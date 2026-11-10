@@ -23,7 +23,7 @@ For an API-free example, run this command in another terminal:
 
     uv run lab-cli lab07 all
 
-Then click **Refresh saved results** in the sidebar. Lab07 is a simulator,
+Then click **Refresh results** in the sidebar. Lab07 is a simulator,
 so it does not generate actual provider token billing or model-answer quality.
 
 ## Docker Compose (no local Python needed)
@@ -31,7 +31,8 @@ so it does not generate actual provider token billing or model-answer quality.
 From the repository root, with Docker Desktop/Engine and Compose:
 
 ```powershell
-docker compose up --build -d dashboard
+docker compose build lab-runner dashboard
+docker compose up -d dashboard
 # Open http://localhost:8501
 docker compose run --rm lab-runner lab07 all
 # In the sidebar, click "Refresh results".
@@ -134,3 +135,5 @@ Dashboard filters never start an experiment or make a provider API call.
 Lab07 is the API-free retry simulator; for the other labs, creating new
 provider measurements normally requires deliberately configuring and
 authorizing a live run. See [lab instructions](README.md) for each workflow.
+For a complete quick start and troubleshooting table, see the
+[project README](../README.md).
