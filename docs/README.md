@@ -8,8 +8,11 @@ recorded results only and never makes real provider calls.
 
 1. Install Docker Engine/Desktop + Docker Compose (recommended), or `uv` if
    you prefer running without Docker.
-2. Copy `.env.example` to `.env` and set your own `GROQ_API_KEY`. Never
-   share this key or commit it to version control.
+2. For **Docker Compose live runs**, copy `.env.example` to `.env` and
+   add your own `GROQ_API_KEY`. For **uv live runs**, set the variable
+   in the process environment; the CLI does not automatically load `.env`.
+   No API key is needed for Lab07, the dashboard or offline tests. Never
+   commit secrets.
 3. **Create your own live config.** `config/default.toml` ships with
    `execution.live_api_enabled = false` on purpose (see **Safety**, below),
    and it is never meant to be edited in place. Create your own copy instead:
@@ -41,6 +44,18 @@ recorded results only and never makes real provider calls.
 ## Running with Docker (recommended)
 
 You don't need Python or `uv` installed at all -- only Docker.
+The CLI uses `lab-runner`; the dashboard is a separate read-only service.
+To start both and produce your first API-free measurements:
+
+```powershell
+docker compose build lab-runner dashboard
+docker compose up -d dashboard
+docker compose run --rm lab-runner lab07 all
+```
+
+Open http://localhost:8501, choose **Refresh results**, and open the
+**Retry simulator** tab. The dashboard is localhost-only, receives no API
+key and mounts `results/` read-only.
 
 ```
 # 1. Build the image (first time, or after pulling repo changes)
@@ -66,8 +81,8 @@ ls results/lab07_rate_limiting/
 
 For any other lab, which does call the real Groq API, pass `--live` and
 `--config config/live.toml` (see Setup, step 3), and make sure
-`GROQ_API_KEY` is set in your shell (Compose reads it from the environment
-via `environment: - GROQ_API_KEY=${GROQ_API_KEY}` in `compose.yaml`):
+`GROQ_API_KEY` is supplied in the environment or your local `.env` file
+(Compose passes it through `GROQ_API_KEY=${GROQ_API_KEY:-}`):
 
 ```
 docker compose run --rm lab-runner lab01 short_prompt --live --config config/live.toml
