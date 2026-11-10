@@ -25,6 +25,17 @@ packages = ["src/lab_core", "src/labs"]
 [project.scripts]
 lab-cli = "lab_core.cli:main"
 
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+# Incremental migration: existing labs/test fixtures contain unused-import
+# and dead-code debt. All other correctness rules remain blocking globally.
+# Strict new/shared modules are separately checked with --isolated in CI.
+select = ["E4", "E7", "E9", "F"]
+ignore = ["F401", "F541", "F841"]
+
 [tool.pytest.ini_options]
 addopts = "-m 'not integration'"
 markers = [
