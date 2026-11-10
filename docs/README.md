@@ -1,5 +1,9 @@
 # Participant Guide
 
+For an overview of all ten labs, the Streamlit dashboard and collaboration
+workflow, see the [project README](../README.md). The dashboard reads local
+recorded results only and never makes real provider calls.
+
 ## Setup
 
 1. Install Docker Engine/Desktop + Docker Compose (recommended), or `uv` if
@@ -55,7 +59,9 @@ yet, to confirm results actually come back out to your machine:
 docker compose run --rm lab-runner lab07 all
 
 # Check the results landed on your HOST machine (results/ is bind-mounted)
-cat results/lab07_rate_limiting.json
+# Results are grouped by the generated per-run ID:
+ls results/lab07_rate_limiting/
+# For example: results/lab07_rate_limiting/<run_id>/raw_measurements.json
 ```
 
 For any other lab, which does call the real Groq API, pass `--live` and
@@ -108,7 +114,9 @@ General pattern: `uv run lab-cli <lab_id> <experiment> --live --config config/li
 or the Docker equivalent: `docker compose run --rm lab-runner <lab_id> <experiment> --live --config config/live.toml [options]`.
 Every example below uses the `uv run lab-cli ...` form; substitute
 `docker compose run --rm lab-runner ...` if you're on the Docker path.
-Results are written as both JSON and CSV under `results/`.
+Results are saved under `results/`; redesigned experiments use per-run
+subdirectories with JSON and/or CSV artifacts. Local results are git-ignored
+and are not automatically uploaded to GitHub.
 
 **Model availability can change.** Groq's hosted model list is not fixed --
 during this project's own live verification, two models it originally
