@@ -53,9 +53,19 @@ docker compose up -d dashboard
 docker compose run --rm lab-runner lab07 all
 ```
 
-Open http://localhost:8501, choose **Refresh results**, and open the
-**Retry simulator** tab. The dashboard is localhost-only, receives no API
-key and mounts `results/` read-only.
+Open http://localhost:8502 (default Docker host port), choose
+**Refresh results**, and open the **Retry simulator** tab. The dashboard
+is localhost-only, receives no API key and mounts `results/` read-only.
+If host port 8502 is already occupied, use a different one without stopping
+the other container:
+
+```powershell
+$env:DASHBOARD_PORT = "8503"
+docker compose up -d --force-recreate dashboard
+# Open http://localhost:8503
+```
+
+Only the host port changes; Streamlit still listens on container port 8501.
 
 ```
 # 1. Build the image (first time, or after pulling repo changes)
