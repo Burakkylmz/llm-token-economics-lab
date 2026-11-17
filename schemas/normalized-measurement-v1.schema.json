@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Burakkylmz/llm-token-economics-lab/blob/master/schemas/normalized-measurement-v1.schema.json",
+  "title": "LLM Token Economics Lab — normalized saved measurement v1",
+  "description": "The read-only normalized metric record produced by dashboard_data._normalize, not the heterogeneous raw measurement file format.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "lab",
+    "experiment",
+    "run_id",
+    "source",
+    "model",
+    "condition",
+    "scenario",
+    "timestamp",
+    "status",
+    "cost_basis",
+    "simulated",
+    "succeeded",
+    "answer_correct",
+    "prompt_tokens",
+    "completion_tokens",
+    "total_tokens",
+    "total_attempts",
+    "retry_count",
+    "rate_limit_response_count",
+    "estimated_cost_usd",
+    "latency_ms",
+    "total_scheduled_wait_seconds",
+    "virtual_completion_time_seconds"
+  ],
+  "properties": {
+    "lab": {
+      "type": "text"
+    },
+    "experiment": {
+      "type": "text"
+    },
+    "run_id": {
+      "type": "text"
+    },
+    "source": {
+      "type": "text"
+    },
+    "model": {
+      "type": "text"
+    },
+    "condition": {
+      "type": "text"
+    },
+    "scenario": {
+      "type": "text"
+    },
+    "timestamp": {
+      "type": "text"
+    },
+    "status": {
+      "type": "text"
+    },
+    "cost_basis": {
+      "type": "text"
+    },
+    "simulated": {
+      "type": "boolean"
+    },
+    "succeeded": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "answer_correct": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "prompt_tokens": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "completion_tokens": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "total_tokens": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "total_attempts": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "retry_count": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "rate_limit_response_count": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "estimated_cost_usd": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "latency_ms": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "total_scheduled_wait_seconds": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "virtual_completion_time_seconds": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    }
+  }
+}
