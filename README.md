@@ -161,7 +161,10 @@ uv run python -m lab_core.benchmark_report --lab lab07 --run-id YOUR_RUN_ID --sc
 ```
 
 Read the [architecture guide](docs/architecture.md),
-[reproducible examples](examples/README.md), and [changelog](CHANGELOG.md).
+[Benchmark Methodology](docs/benchmark-methodology.md) for the metric formulas,
+[Data Dictionary](docs/data-dictionary.md) for field definitions, units and
+raw-source mappings, [reproducible examples](examples/README.md), and
+[changelog](CHANGELOG.md).
 The changelog is currently **Unreleased**; no public version tag or
 license has been approved by upstream maintainers.
 
