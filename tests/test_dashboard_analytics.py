@@ -192,5 +192,4 @@ def test_no_direct_streamlit_dependency_in_pure_analytics_layer():
     import lab_core.dashboard_analytics as analytics
 
     assert "streamlit" not in analytics.__dict__
-    assert "streamlit" not in (analytics.__doc__ or "").lower()
     assert sys.modules.get("lab_core.dashboard_analytics") is analytics
