@@ -14,8 +14,9 @@ services:
       dockerfile: Dockerfile.dashboard
     init: true
     ports:
-      # Loopback-only: not exposed on the public network.
-      - "127.0.0.1:8501:8501"
+      # Loopback only; default host port 8502 avoids a local Streamlit on 8501.
+      # Override the HOST port with DASHBOARD_PORT (container stays on 8501).
+      - "127.0.0.1:${DASHBOARD_PORT:-8502}:8501"
     volumes:
       # UI may view experiment files but cannot modify them.
       - ./results:/app/results:ro
