@@ -168,6 +168,27 @@ raw-source mappings, [reproducible examples](examples/README.md), and
 The changelog is currently **Unreleased**; no public version tag or
 license has been approved by upstream maintainers.
 
+## Offline validation and schema versioning
+
+Saved experiment runs can now be checked **without an API key** using a
+read-only, version-aware CLI. Newly generated Lab07 manifests declare the
+normalized metric contract **v1**; historical runs without that marker are
+still supported with explicit compatibility warnings.
+
+```powershell
+uv run python -m lab_core.experiment_validation --help
+uv run python -m lab_core.experiment_validation --experiment lab07_rate_limiting --run-id YOUR_RUN_ID --format json --output results/validation-reports/lab07.json
+```
+
+Add `--strict` to fail on warnings (including unversioned manifests).
+Validation reports never contain raw prompts or model responses. Unknown
+future versions fail closed; the validator does **not** rewrite source
+measurements or automatically repair them. For executable examples,
+allowed fields and compatibility policy, see the
+[Validation Guide](docs/experiment-validation.md),
+[Schema Evolution Guide](docs/schema-evolution.md) and
+[normalized v1 JSON Schema](schemas/normalized-measurement-v1.schema.json).
+
 ## Running live Groq experiments
 
 **Skip this section if you only want the dashboard, offline tests or Lab07.**
