@@ -134,6 +134,37 @@ Get-ChildItem .\results\lab07_rate_limiting -Recurse
 
 Read the [Dashboard Guide](docs/dashboard.md) for additional detail.
 
+## Reproducible benchmarks and architecture
+
+An offline, read-only benchmark reporter summarizes existing measurements
+**per lab, per run, scenario and workload**. It includes recorded
+sample counts beside each metric, request-level mean token/cost figures,
+nearest-rank p50/p95 latency and (for Lab07) synthetic retry outcomes.
+No provider calls are made by the reporter; it does not export raw prompts.
+
+Run an API-free, seeded Lab07 example from the repository root:
+
+```powershell
+uv sync --frozen --group dev
+.\examples\run_lab07_and_report.ps1
+```
+
+On Linux/macOS/WSL use `bash examples/run_lab07_and_report.sh`.
+If Windows PowerShell script execution is restricted, follow the equivalent
+individual commands in [examples/README.md](examples/README.md) instead.
+The scripts create local Markdown and JSON summaries in `results/benchmarks/`.
+
+To report a previously saved run:
+
+```powershell
+uv run python -m lab_core.benchmark_report --lab lab07 --run-id YOUR_RUN_ID --scenario transient_failures --output results/benchmarks/report.md
+```
+
+Read the [architecture guide](docs/architecture.md),
+[reproducible examples](examples/README.md), and [changelog](CHANGELOG.md).
+The changelog is currently **Unreleased**; no public version tag or
+license has been approved by upstream maintainers.
+
 ## Running live Groq experiments
 
 **Skip this section if you only want the dashboard, offline tests or Lab07.**
