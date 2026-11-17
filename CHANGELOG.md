@@ -1,7 +1,7 @@
 # Changelog
 
 All notable project changes should be summarized here by contributors.
-The Python package version in \`pyproject.toml\` is presently \`0.1.0\`,
+The Python package version in `pyproject.toml` is presently `0.1.0`,
 but **no GitHub Release or SemVer compatibility promise is implied**.
 Do not add a release tag before maintainers approve a version and release plan.
 
