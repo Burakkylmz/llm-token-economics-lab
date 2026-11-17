@@ -269,8 +269,20 @@ def main(argv: list[str] | None = None) -> int:
         experiment = comparison["context"]["experiment"]
         if experiment not in ("legacy",) and experiment:
             validation = validate_run(args.results_dir, experiment=experiment, run_id=args.run_id)
-            if not validation.to_report()["valid"]:
+            validation_report = validation.to_report()
+            if not validation_report["valid"]:
                 raise ValueError("Selected experiment data failed validation; repair the saved run before comparing")
+            comparison["validation"] = {
+                "compatibility": validation_report["compatibility"],
+                "warnings": validation_report["warnings"],
+                "files_checked": validation_report["files_checked"],
+                "records_checked": validation_report["records_checked"],
+            }
+            if validation_report["warnings"]:
+                comparison["notes"].append(
+                    "The selected run passed preflight with validation warnings "
+                    f"({validation_report['warnings']}); inspect the validation report before interpretation."
+                )
         else:
             raise ValueError("Legacy flat files cannot be compared without a run-specific manifest")
     except ValueError as exc:
