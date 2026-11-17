@@ -96,6 +96,12 @@ Groq requests.
 - Compare groups descriptively with bar charts.
 - Export only approved normalized metrics to CSV.
 
+For detailed aggregation formulas and source-field definitions, see
+[Benchmark Methodology](benchmark-methodology.md) and
+[Data Dictionary](data-dictionary.md). The dashboard's own overview
+summaries may use different grouping/output fields from the offline
+benchmark reporter; do not silently treat them as identical statistics.
+
 ## Accuracy and privacy
 
 - Missing values remain missing and are never treated as zero.
