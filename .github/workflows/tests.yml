@@ -22,5 +22,9 @@ jobs:
         run: uv run python -m py_compile dashboard/app.py src/lab_core/dashboard_data.py
       - name: Verify offline benchmark reporter CLI
         run: uv run python -m lab_core.benchmark_report --help
+      - name: Check normalized v1 JSON Schema and validator CLI
+        run: |
+          uv run python -m json.tool schemas/normalized-measurement-v1.schema.json > /dev/null
+          uv run python -m lab_core.experiment_validation --help
       - name: Run offline tests
         run: uv run pytest -q

@@ -221,4 +221,7 @@ The reporter reads existing locally saved results only. For a new,
 seeded Lab07 example, see [examples](../examples/README.md).
 JSON `schema_version = 1` identifies the **report output format**,
 not a versioned validation contract for every lab’s raw files.
-Raw measurement schema validation and migrations are **future work**.
+An opt-in [Experiment Validation Engine](experiment-validation.md)
+now checks selected raw measurements and the versioned normalized v1
+contract. **Universal raw-file schemas, automatic migrations and
+Dashboard-level enforcement remain future work.**
