@@ -8,6 +8,13 @@ Do not add a release tag before maintainers approve a version and release plan.
 ## Unreleased
 
 ### Added
+- Offline, bounded, read-only experiment validation with structured
+  diagnostics, strict mode, and versioned normalized v1 contract.
+- JSON Schema for 23 normalized measurement fields; compatible legacy
+  unversioned runs and fail-closed unsupported-version handling.
+- Versioned Lab07 manifest marker and tests for corruption, simulation
+  invariants, symlink/path safety and CLI behavior.
+- Validation and Schema Evolution developer guides.
 - Architecture and explicit runtime/data-boundary documentation.
 - Benchmark Methodology and Data Dictionary with verified field mappings,
   worked calculation examples, and documentation-to-code contract tests.
