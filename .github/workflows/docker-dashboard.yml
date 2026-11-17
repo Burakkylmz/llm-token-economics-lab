@@ -64,6 +64,29 @@ jobs:
           assert all(group["metrics"]["estimated_cost_usd"]["observed"] == 0 for group in report["groups"])
           print("Validated offline benchmark summary for", report["run_id"])
           PY
+      - name: Compare two Lab07 strategies and verify matched JSON deltas
+        run: |
+          set -euo pipefail
+          run_id=$(python -c "from pathlib import Path; print(sorted(p.name for p in Path('results/lab07_rate_limiting').iterdir() if p.is_dir())[-1])")
+          docker compose run --rm --entrypoint uv lab-runner run python -m lab_core.experiment_comparison \
+            --lab lab07 --run-id "$run_id" --scenario transient_failures \
+            --baseline-condition no_backoff --candidate-condition exponential_backoff \
+            --format json --output results/comparisons/docker-smoke.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          result = json.loads(Path("results/comparisons/docker-smoke.json").read_text(encoding="utf-8"))
+          assert result["comparison_report_version"] == 1
+          assert result["lab"] == "lab07" and result["simulated"]
+          assert result["context"]["scenario"] == "transient_failures"
+          assert result["baseline"]["requests"] > 0 and result["candidate"]["requests"] > 0
+          assert result["validation"]["compatibility"] == "v1"
+          assert result["validation"]["warnings"] == 0
+          assert result["metrics"]["retry_count"]["baseline_observed"] > 0
+          assert result["metrics"]["total_tokens"]["absolute_delta"] is None
+          print("Compared two simulated strategies in saved Lab07 run:", result["run_id"])
+          PY
       - name: Start dashboard without any API key
         run: docker compose up -d --no-deps dashboard
       - name: Verify local health endpoint

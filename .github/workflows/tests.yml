@@ -26,5 +26,7 @@ jobs:
         run: |
           uv run python -m json.tool schemas/normalized-measurement-v1.schema.json > /dev/null
           uv run python -m lab_core.experiment_validation --help
+      - name: Check comparison CLI entry point
+        run: uv run python -m lab_core.experiment_comparison --help
       - name: Run offline tests
         run: uv run pytest -q

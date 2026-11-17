@@ -189,6 +189,25 @@ allowed fields and compatibility policy, see the
 [Schema Evolution Guide](docs/schema-evolution.md) and
 [normalized v1 JSON Schema](schemas/normalized-measurement-v1.schema.json).
 
+## Advanced experiment comparison (PR #15)
+
+Compare two **conditions inside the same saved run and scenario**, without
+making provider API calls. Results include differences in success percentage
+points, retries/virtual wait (Lab07), and recorded tokens, estimated cost,
+mean latency and latency p50/p95 (where available). Every difference retains
+the number of observed measurements; missing data remains `N/A` rather
+than becoming zero.
+
+```powershell
+uv run python -m lab_core.experiment_comparison --lab lab07 --run-id validation-demo-01 --scenario transient_failures --baseline-condition no_backoff --candidate-condition rate_limit_aware --format md --output results/comparisons/validation-demo-01.md
+```
+
+The engine refuses ambiguous, mismatched-source/cost-basis groups and
+unvalidated input records. Cross-model comparisons require explicit
+`--allow-model-difference` acknowledgement and remain exploratory.
+These are descriptive **unpaired** differences, not controlled causal effects.
+See the [Experiment Comparison Guide](docs/experiment-comparison.md).
+
 ## Running live Groq experiments
 
 **Skip this section if you only want the dashboard, offline tests or Lab07.**
