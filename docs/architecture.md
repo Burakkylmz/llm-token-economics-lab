@@ -108,7 +108,10 @@ root filesystem. This configuration is **not** hardened for public hosting.
 
 ## Evolution guidance
 
-Future work should add versioned schemas and migration tests before changing
+The optional normalized measurement v1 contract and [Validation Engine](experiment-validation.md)
+allow preflight checks of saved measurements without changing their
+underlying heterogeneous raw formats. Future work should add full raw
+schema registries and migration tests before changing
 on-disk formats. Consider dedicated provider interfaces only when a second
 provider is actually implemented. Do not claim the existence of a gateway,
 queue, distributed scheduler, remote result store or fully locked dashboard

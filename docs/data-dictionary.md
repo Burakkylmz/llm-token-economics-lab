@@ -206,6 +206,22 @@ The reporter **does not** currently aggregate `prompt_tokens`,
 metrics map. Those fields remain available in normalized CSV
 or other lab-specific reports.
 
+## Versioned normalized contract and validation (PR #14)
+
+The normalized **23-field read-only record** now has a machine-readable
+[JSON Schema v1](../schemas/normalized-measurement-v1.schema.json) and
+an opt-in [Validation Engine](experiment-validation.md). Newly written
+Lab07 manifests declare `normalized_contract_version: 1`.
+Unversioned historical lab files remain readable but are explicitly
+reported as `legacy_unversioned`; unsupported future versions fail
+closed rather than silently downgrading.
+
+This is **not** an enforced universal raw JSON/CSV schema. The new
+validator checks selected raw values, normalized types and simulation
+invariants. It never mutates original result files and does not run
+automatically when opening the Dashboard. See
+[Schema Evolution Policy](schema-evolution.md) for future migrations.
+
 ## Contract boundaries / migration status
 
 - The data dictionary is **versioned by the Git commit that contains

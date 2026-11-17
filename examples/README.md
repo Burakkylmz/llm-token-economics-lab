@@ -38,6 +38,18 @@ timestamped run ID, then saves two reports under `results/benchmarks/`:
 Both files are ignored by Git as part of `results/`. The report content
 does not contain raw prompts or model completions.
 
+## Validating saved results (no API key)
+
+For a Lab07 run generated after versioned manifest support:
+
+```powershell
+uv run python -m lab_core.experiment_validation --experiment lab07_rate_limiting --run-id YOUR_RUN_ID --strict --format json --output results/validation-reports/lab07.json
+```
+
+See [Experiment Validation](../docs/experiment-validation.md) and
+[Schema Evolution](../docs/schema-evolution.md) for error codes and
+older-run compatibility.
+
 ## Reporting an existing experiment
 
 First find its exact run ID under your local results folder. For example,
