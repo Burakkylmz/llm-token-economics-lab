@@ -97,9 +97,12 @@ def render_advanced_analytics(records: list[dict], results_dir: Path) -> None:
 
     different_models = baseline_id[3] != candidate_id[3]
     if different_models:
+        pair_key = hashlib.sha256(
+            repr((lab, run_id, context, baseline_id, candidate_id)).encode("utf-8")
+        ).hexdigest()[:16]
         allow_different_models = st.checkbox(
             "Acknowledge exploratory comparison of different models",
-            value=False, key="analytics_ack_models",
+            value=False, key=f"analytics_ack_models_{pair_key}",
             help="This is not evidence of equal prompts, price assumptions or model quality.",
         )
         if not allow_different_models:
