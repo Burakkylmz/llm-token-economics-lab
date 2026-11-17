@@ -20,5 +20,7 @@ jobs:
         run: uv sync --frozen --group dev
       - name: Compile dashboard UI
         run: uv run python -m py_compile dashboard/app.py src/lab_core/dashboard_data.py
+      - name: Verify offline benchmark reporter CLI
+        run: uv run python -m lab_core.benchmark_report --help
       - name: Run offline tests
         run: uv run pytest -q
