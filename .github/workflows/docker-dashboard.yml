@@ -18,8 +18,12 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Validate compose configuration
-        run: docker compose config --quiet
+      - name: Validate compose configuration and port override
+        run: |
+          docker compose config --quiet
+          DASHBOARD_PORT=8503 docker compose config --quiet
+          docker compose config --format json | python -c "import json, sys; cfg=json.load(sys.stdin); ports=cfg['services']['dashboard']['ports']; assert any(p['published']=='8502' and p['target']==8501 and p['host_ip']=='127.0.0.1' for p in ports), ports"
+          DASHBOARD_PORT=8503 docker compose config --format json | python -c "import json, sys; cfg=json.load(sys.stdin); ports=cfg['services']['dashboard']['ports']; assert any(p['published']=='8503' and p['target']==8501 and p['host_ip']=='127.0.0.1' for p in ports), ports"
       - name: Build independent CLI and dashboard images
         run: docker compose build lab-runner dashboard
       - name: Generate offline Lab07 results through existing CLI
@@ -32,7 +36,7 @@ jobs:
           healthy=0
           for i in $(seq 1 35); do
             if curl --fail --silent --show-error --max-time 3 \
-              http://127.0.0.1:8501/_stcore/health >/dev/null; then
+              http://127.0.0.1:8502/_stcore/health >/dev/null; then
               healthy=1
               break
             fi
