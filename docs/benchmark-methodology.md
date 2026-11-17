@@ -210,6 +210,17 @@ The current reporter separates records by
 are not evidence of causal superiority without an appropriate
 experimental design and analysis.
 
+## Condition-to-condition comparison
+
+The optional [Experiment Comparison Engine](experiment-comparison.md)
+builds on this benchmark aggregation. It computes candidate-minus-baseline
+differences with explicit observed denominators; success/accuracy differences
+are in fractions and percentage points. Numeric means and nearest-rank
+p50/p95 latencies remain descriptive. The engine refuses unrelated source,
+scenario and cost-basis groups and requires acknowledgement for model
+differences. It never pairs individual requests and never claims statistical
+significance.
+
 ## 8. Reproduce an existing report
 
 ```powershell

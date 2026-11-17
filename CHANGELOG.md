@@ -8,6 +8,12 @@ Do not add a release tag before maintainers approve a version and release plan.
 ## Unreleased
 
 ### Added
+- PR #15: Read-only, matched within-run condition comparison CLI and
+  JSON/Markdown reports (success/accuracy percentage points, numeric
+  means, latency p50/p95, and observed-n denominators).
+- Matched source/scenario/cost-basis guardrails, explicit cross-model
+  acknowledgement and preflight experiment validation.
+- Offline comparison tests, Docker smoke integration and developer guide.
 - Offline, bounded, read-only experiment validation with structured
   diagnostics, strict mode, and versioned normalized v1 contract.
 - JSON Schema for 23 normalized measurement fields; compatible legacy

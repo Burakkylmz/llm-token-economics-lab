@@ -50,6 +50,18 @@ See [Experiment Validation](../docs/experiment-validation.md) and
 [Schema Evolution](../docs/schema-evolution.md) for error codes and
 older-run compatibility.
 
+## Comparing two conditions in one saved Lab07 scenario
+
+```powershell
+uv run python -m lab_core.experiment_comparison --lab lab07 --run-id YOUR_RUN_ID --scenario transient_failures --baseline-condition no_backoff --candidate-condition rate_limit_aware --format json --output results/comparisons/lab07.json
+```
+
+This is **descriptive** comparison of two strategy groups using the
+same run/scenario and the saved measurements only; it does not send
+provider requests or pick a universally best strategy. See the
+[Comparison Guide](../docs/experiment-comparison.md) for controlled
+group-selection rules and interpretation limitations.
+
 ## Reporting an existing experiment
 
 First find its exact run ID under your local results folder. For example,
