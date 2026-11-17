@@ -9,6 +9,16 @@ read raw prompts/model completions.
 This tool produces **descriptive group differences**, not paired per-request
 effects, significance tests or a recommendation of the "best" strategy.
 
+## Interactive Streamlit visualization (PR #16)
+
+The [Advanced analytics Dashboard tab](dashboard.md#advanced-analytics-tab)
+offers the **same comparison engine** through Streamlit, with scoped
+lab/run/scenario/context selectors, saved-data validation, a comparison
+table with individual observed-n denominators, a side-by-side metric
+chart and in-memory JSON/Markdown downloads. This does **not** alter
+the CLI contract or run new experiments. Model differences still
+require explicit acknowledgement.
+
 ## Windows quick start — your existing Lab07 run
 
 Your `validation-demo-01` run was successfully verified against normalized
