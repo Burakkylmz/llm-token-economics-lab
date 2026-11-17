@@ -28,7 +28,7 @@ docker compose run --rm lab-runner lab07 all
 docker compose ps
 ```
 
-Open **http://localhost:8501**, click **Refresh results**, and select the **Retry simulator** tab.
+Open **http://localhost:8502**, click **Refresh results**, and select the **Retry simulator** tab (Docker default).
 
 To see the container logs or stop the dashboard:
 
@@ -37,14 +37,24 @@ docker compose logs dashboard
 docker compose stop dashboard
 ```
 
-The dashboard is deliberately bound to **127.0.0.1:8501**, not the public network. Its container runs as a non-root user, has a read-only filesystem, and mounts `./results` **read-only**. The separate `lab-runner` service can write experiment files to that directory. The dashboard receives **no Groq API key** and cannot launch provider experiments.
+The Docker dashboard is bound to **127.0.0.1:8502** by default (host port), not the public network. Its internal Streamlit port stays **8501**. Its container runs as a non-root user, has a read-only filesystem, and mounts `./results` **read-only**. The separate `lab-runner` service can write experiment files to that directory. The dashboard receives **no Groq API key** and cannot launch provider experiments.
 
-After updating the repository, rebuild the images to pick up changes:
+If port **8502** is occupied, choose a different host port without stopping other projects:
+
+```powershell
+$env:DASHBOARD_PORT = "8503"
+docker compose up -d --force-recreate dashboard
+# Open http://localhost:8503
+```
+
+This override applies to the current PowerShell session; to return to the default, run `Remove-Item Env:DASHBOARD_PORT` and recreate the dashboard container. Never edit the container's internal port or its healthcheck to change the host port.
+
+After updating the repository, rebuild the images and recreate the dashboard container to pick up changes:
 
 ```powershell
 git pull origin master
 docker compose build lab-runner dashboard
-docker compose up -d dashboard
+docker compose up -d --force-recreate dashboard
 ```
 
 ## Quick start — Python + uv
@@ -60,7 +70,7 @@ uv run --with "streamlit>=1.40,<2" streamlit run dashboard/app.py
 
 Open **http://localhost:8501** and click **Refresh results**. Keep the Streamlit terminal running while using the dashboard; stop it with **Ctrl+C**.
 
-Choose **one** launch method for the dashboard. If it is already running locally, stop that process before starting the Docker service, because both use port 8501 by default.
+The Docker dashboard defaults to host port **8502**, while local Streamlit defaults to **8501**; both can run simultaneously. If another application occupies 8502, set `DASHBOARD_PORT` as shown above.
 
 ## The 10 laboratories
 
@@ -183,7 +193,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution standards and [SECURITY.
 
 | Problem | What to check |
 | --- | --- |
-| Port 8501 already in use | Stop the other Streamlit session or dashboard container; do not run both launch methods simultaneously. |
+| Dashboard host port 8502 already in use | Set `$env:DASHBOARD_PORT = "8503"`, then run `docker compose up -d --force-recreate dashboard` and open `http://localhost:8503`. |
 | Docker dashboard not opening | Check `docker compose ps` and `docker compose logs dashboard`; confirm Docker Desktop is running Linux containers. |
 | Lab filter lists only Lab07 | Pull the latest `master` and restart Streamlit. All ten lab names should be selectable. |
 | Lab listed but graphs are empty | The lab has no supported locally saved measurements yet; select a run with data or execute the intended lab separately. |
