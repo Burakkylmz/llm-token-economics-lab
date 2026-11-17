@@ -123,6 +123,15 @@ definitions or adding future contract versions. In particular, do
 not silently map an unsupported future version to v1, and do not
 reinterpret old measurements without preserving their provenance.
 
+## Using the validation engine with comparisons
+
+The [Experiment Comparison Engine](experiment-comparison.md) performs
+a read-only validation of the selected saved run before producing
+differences. Validation errors block comparison. Unversioned legacy
+runs remain permitted with compatibility warnings, but workload
+equivalence, model pricing and experimental design still require
+independent review.
+
 ## Current limitations
 
 - This is an opt-in CLI. The Dashboard and benchmark reporter do
