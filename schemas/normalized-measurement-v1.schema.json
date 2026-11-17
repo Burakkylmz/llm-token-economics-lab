@@ -32,34 +32,34 @@
   ],
   "properties": {
     "lab": {
-      "type": "text"
+      "type": "string"
     },
     "experiment": {
-      "type": "text"
+      "type": "string"
     },
     "run_id": {
-      "type": "text"
+      "type": "string"
     },
     "source": {
-      "type": "text"
+      "type": "string"
     },
     "model": {
-      "type": "text"
+      "type": "string"
     },
     "condition": {
-      "type": "text"
+      "type": "string"
     },
     "scenario": {
-      "type": "text"
+      "type": "string"
     },
     "timestamp": {
-      "type": "text"
+      "type": "string"
     },
     "status": {
-      "type": "text"
+      "type": "string"
     },
     "cost_basis": {
-      "type": "text"
+      "type": "string"
     },
     "simulated": {
       "type": "boolean"
