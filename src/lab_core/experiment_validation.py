@@ -8,6 +8,7 @@ inputs. Nothing in this module starts an experiment or calls a provider.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import math
 import sys
@@ -137,9 +138,9 @@ class ValidationResult:
 
 def _safe_run_id(value: str) -> bool:
     """Disallow traversal, separators, drive letters and hidden relative paths."""
-    return bool(value) and value not in (".", "..") and not any(
-        char in value for char in ("/", "\\", "\x00", ":")
-    )
+    return bool(value) and len(value) <= 128 and value not in (".", "..") and not any(
+        char in value for char in ("/", "\\", ":")
+    ) and all(32 <= ord(char) < 127 for char in value)
 
 
 def _manifest_version(run_dir: Path, result: ValidationResult) -> dict:
@@ -288,7 +289,7 @@ def validate_run(results_dir: Path, *, experiment: str, run_id: str) -> Validati
             if path.stat().st_size > MAX_FILE_BYTES:
                 raise ValueError("File size exceeds permitted bound")
             rows = _read_rows(path)
-        except (OSError, ValueError, UnicodeError):
+        except (OSError, ValueError, UnicodeError, csv.Error):
             result.issue("error", "invalid_measurement_file", name)
             continue
         seen_stems.add(stem)
