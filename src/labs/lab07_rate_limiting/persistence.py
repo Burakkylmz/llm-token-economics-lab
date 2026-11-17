@@ -91,6 +91,9 @@ def build_initial_manifest(experiment_run_id: str, config: Lab07Config, profile:
         "profile": profile,
         "randomization_seed": seed,
         "simulation_version": "v1.0-virtual-clock",
+        # Versioned read-only normalized metric contract (not a claim that
+        # all heterogeneous laboratory raw formats share this schema).
+        "normalized_contract_version": 1,
         "real_api_calls": 0,
         "real_token_usage": None,
         "real_api_cost": 0,
