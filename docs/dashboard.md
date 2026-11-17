@@ -33,7 +33,7 @@ From the repository root, with Docker Desktop/Engine and Compose:
 ```powershell
 docker compose build lab-runner dashboard
 docker compose up -d dashboard
-# Open http://localhost:8501
+# Open http://localhost:8502 (Docker default host port)
 docker compose run --rm lab-runner lab07 all
 # In the sidebar, click "Refresh results".
 docker compose ps
@@ -52,8 +52,9 @@ test for verified build/runtime behavior.
 **Security boundaries:** the dashboard receives no `GROQ_API_KEY`
 environment variable, runs as an unprivileged user, mounts the local
 `results/` directory read-only, has a read-only container filesystem
-with ephemeral `/tmp`, and publishes TCP port 8501 on `127.0.0.1`
-only. This is a local development tool, not an authenticated internet
+with ephemeral `/tmp`, and publishes TCP port **8502** on `127.0.0.1`
+only by default. Streamlit still listens on internal container port
+**8501**; only the host mapping is configurable. This is a local development tool, not an authenticated internet
 service. CLI experiments can still write to `results/` via their
 separate container and need explicit live opt-in.
 
@@ -61,9 +62,20 @@ The Compose healthcheck calls Streamlit's local
 `/_stcore/health` endpoint. Run `docker compose ps` to see the
 healthy status or `docker compose logs dashboard` for details.
 
-If Docker reports that port 8501 is already allocated, stop any local
-Streamlit session before starting the Compose service. On Windows,
-Docker Desktop should be running Linux containers.
+If Docker reports that host port **8502** is already allocated, keep
+other containers running and override just this dashboard's host port:
+
+```powershell
+$env:DASHBOARD_PORT = "8503"
+docker compose up -d --force-recreate dashboard
+# Open http://localhost:8503
+```
+
+To return to port 8502 in PowerShell, run
+`Remove-Item Env:DASHBOARD_PORT` and recreate the container.
+A locally launched Streamlit session can continue using port 8501
+without conflicting with this Docker service. On Windows, Docker
+Desktop should be running Linux containers.
 
 ### API-free smoke test
 
