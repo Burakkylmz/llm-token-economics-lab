@@ -8,6 +8,12 @@ Do not add a release tag before maintainers approve a version and release plan.
 ## Unreleased
 
 ### Added
+- PR #16: Advanced analytics Streamlit tab for scoped baseline/candidate
+  comparisons, observed-n coverage and side-by-side charts.
+- Offline validation-gated results; explicit model-difference consent
+  scoped to the selected pair; JSON and Markdown downloads in memory.
+- Pure presentation adapters, regression tests and end-to-end Docker
+  Dashboard UI smoke validation.
 - PR #15: Read-only, matched within-run condition comparison CLI and
   JSON/Markdown reports (success/accuracy percentage points, numeric
   means, latency p50/p95, and observed-n denominators).
