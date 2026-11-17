@@ -117,6 +117,11 @@ benchmark reporter; do not silently treat them as identical statistics.
 - Run this app on a trusted local machine; Streamlit is a local web server.
 - Large, malformed and inaccessible files are skipped with warnings.
 
+For optional offline validation of saved data, see the
+[Experiment Validation Guide](experiment-validation.md). The Dashboard
+currently does **not** block display of runs that have not been validated;
+run the validator independently before relying on measurements.
+
 ## Future work
 
 Paired experiment-level comparisons with uncertainty bands, per-lab specialized
