@@ -106,6 +106,43 @@ jobs:
             docker compose logs dashboard
             exit 1
           fi
+      - name: Exercise Advanced analytics with the real saved Lab07 run
+        run: |
+          docker compose exec -T dashboard python - <<'PY'
+          from pathlib import Path
+
+          from lab_core.dashboard_data import scan_results
+          from lab_core.dashboard_analytics import (
+              available_runs, available_scenarios, build_scoped_benchmark,
+              matching_contexts, groups_for_context, compare_selected,
+              comparison_rows, chart_rows,
+          )
+          from streamlit.testing.v1 import AppTest
+
+          rows, warnings = scan_results(Path("/app/results"))
+          lab07 = next(run for run in available_runs(rows) if run[0] == "lab07")
+          scenarios = available_scenarios(rows, lab=lab07[0], run_id=lab07[1])
+          assert "transient_failures" in scenarios
+          report = build_scoped_benchmark(
+              rows, lab=lab07[0], run_id=lab07[1], scenario="transient_failures",
+          )
+          contexts = matching_contexts(report)
+          context = next(ctx for ctx in contexts if ctx[0] == "lab07_rate_limiting")
+          groups = groups_for_context(report, context)
+          baseline = next(g for g in groups if g[4] == "no_backoff")
+          candidate = next(g for g in groups if g[4] == "exponential_backoff")
+          compared = compare_selected(report, baseline, candidate)
+          assert compared["simulated"]
+          assert compared["metrics"]["retry_count"]["baseline_observed"] > 0
+          assert len(comparison_rows(compared)) >= 8
+          assert chart_rows(compared, "retry_count")
+
+          app = AppTest.from_file("/app/dashboard/app.py", default_timeout=35).run()
+          assert not app.exception, [str(exc.message) for exc in app.exception]
+          assert "Advanced analytics" in [tab.label for tab in app.tabs]
+          assert "Baseline condition" in [select.label for select in app.selectbox]
+          print("Verified interactive advanced analytics tab and matched saved Lab07 values")
+          PY
       - name: Assert API isolation and saved Lab07 result visibility
         run: |
           docker compose exec -T dashboard python -c "import os; assert not os.getenv('GROQ_API_KEY'), 'Dashboard must not receive Groq credentials'"

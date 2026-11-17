@@ -208,6 +208,37 @@ unvalidated input records. Cross-model comparisons require explicit
 These are descriptive **unpaired** differences, not controlled causal effects.
 See the [Experiment Comparison Guide](docs/experiment-comparison.md).
 
+## Advanced analytics in the Streamlit Dashboard (PR #16)
+
+The **Advanced analytics** tab uses the saved-run comparison engine
+directly. Choose exactly one lab, run, scenario and measurement context,
+then a baseline and candidate. The UI shows recorded per-metric sample
+sizes, absolute/relative changes, percentage-point success differences,
+and side-by-side charts. Export **JSON or Markdown** without writing
+anything into the underlying run directory.
+
+The tab performs **offline input validation** before displaying
+comparisons and blocks invalid runs. Comparing different model IDs
+requires an explicit, selection-specific acknowledgement.
+Missing metrics stay unavailable rather than becoming zeros.
+Lab07 displays only synthetic client, retry and virtual-wait outcomes.
+
+Run locally:
+
+```powershell
+uv run --with "streamlit>=1.40,<2" streamlit run dashboard/app.py
+```
+
+Or in Docker Desktop, open **http://localhost:8502** after:
+
+```powershell
+docker compose up -d --build dashboard
+```
+
+See the [Advanced Dashboard Guide](docs/dashboard.md#advanced-analytics-tab)
+and [Comparison Methodology](docs/experiment-comparison.md).
+No live provider credentials are needed to view saved results.
+
 ## Running live Groq experiments
 
 **Skip this section if you only want the dashboard, offline tests or Lab07.**

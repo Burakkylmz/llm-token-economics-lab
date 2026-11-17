@@ -102,6 +102,53 @@ For detailed aggregation formulas and source-field definitions, see
 summaries may use different grouping/output fields from the offline
 benchmark reporter; do not silently treat them as identical statistics.
 
+## Advanced analytics tab
+
+This tab uses the same **PR #15 comparison engine** as the CLI, not a
+separate implementation of statistical formulas.
+
+1. Open the Dashboard and choose **Advanced analytics**.
+2. Select a **Lab and saved run**, then one **Scenario**.
+3. Select a **Matched measurement context**: one experiment family,
+   measurement source filename, scenario and cost basis. Contexts with
+   fewer than two distinct conditions are not offered.
+4. Select a **Baseline condition** and a different **Candidate
+   condition**; both labels also show the saved model identifier.
+5. If model identifiers differ, explicitly acknowledge the exploratory
+   cross-model comparison. This consent is tied to the selected pair.
+6. The Dashboard runs the **offline experiment validator** before
+   presenting any comparison. Validation errors block the result.
+   Unversioned input warnings are displayed rather than hidden.
+7. Inspect the **measured values and differences** table and choose
+   a metric to display in the side-by-side chart. Download a JSON
+   or Markdown summary if needed.
+
+**All sidebar lab/run/model/condition/scenario filters continue to
+apply.** If no matching pairs are available, change the filters or
+generate a new saved experiment first. No option runs an experiment
+from the Dashboard.
+
+The table includes baseline/candidate recorded values, separate
+**observed-n** denominators, absolute delta, relative delta percentage,
+and percentage-point delta for success/answer accuracy. A recorded
+zero is not an unavailable value. Relative percentage is undefined
+when the baseline is zero, and is displayed as unavailable.
+
+The charts display **two recorded group values**, not confidence
+intervals or inference about causal effects. For Lab07 these are
+**synthetic client outcomes**, retries, rate-limit counts and virtual
+seconds, never real API latency, provider token billing or response
+quality. Do not call the lowest-wait strategy the best overall without
+reviewing reliability and the experimental design.
+
+The comparison UI imports only approved fields from the existing
+local measurement loader. JSON and Markdown downloads are generated
+in memory; no source measurements are altered. The Docker service
+continues to have a read-only results mount and no API key.
+
+See [Comparison Guide](experiment-comparison.md) for the exact
+pair-selection and delta rules, including limitations.
+
 ## Accuracy and privacy
 
 - Missing values remain missing and are never treated as zero.

@@ -19,7 +19,7 @@ jobs:
       - name: Install locked dependencies
         run: uv sync --frozen --group dev
       - name: Compile dashboard UI
-        run: uv run python -m py_compile dashboard/app.py src/lab_core/dashboard_data.py
+        run: uv run python -m py_compile dashboard/app.py dashboard/analytics_ui.py src/lab_core/dashboard_data.py src/lab_core/dashboard_analytics.py
       - name: Verify offline benchmark reporter CLI
         run: uv run python -m lab_core.benchmark_report --help
       - name: Check normalized v1 JSON Schema and validator CLI

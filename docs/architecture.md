@@ -45,6 +45,8 @@ network or provider calls.
 | `dashboard/app.py`, `dashboard_view.py` | Read-only, local visualization and presentation helpers | No experiment triggering |
 | `src/lab_core/benchmark_report.py` | Pure grouping + numeric aggregation + JSON/Markdown rendering | **No provider SDK**, no writing into source result files |
 | `src/lab_core/experiment_comparison.py` | Guarded selection and descriptive two-condition differences | Same run/source/scenario/cost basis; no provider calls or raw content export |
+| `src/lab_core/dashboard_analytics.py` | Pure saved-run/context selection and chart-ready observed metrics | No Streamlit import or provider SDK |
+| `dashboard/analytics_ui.py` | Advanced analytics interactions, validation warnings and safe downloads | Streamlit-only view; existing comparison engine owns all statistics |
 
 ## Save → normalize → report
 

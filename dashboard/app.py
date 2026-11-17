@@ -10,6 +10,7 @@ from pathlib import Path
 
 import streamlit as st
 
+from dashboard.analytics_ui import render_advanced_analytics
 from lab_core.dashboard_data import (
     EXPORT_COLUMNS,
     export_csv,
@@ -161,8 +162,8 @@ if all(row["simulated"] for row in filtered):
         "and actual request latency are unavailable by design."
     )
 
-overview, comparison, simulator, detail = st.tabs(
-    ["Overview", "Model comparison", "Retry simulator", "Measurements"]
+overview, comparison, simulator, analytics, detail = st.tabs(
+    ["Overview", "Model comparison", "Retry simulator", "Advanced analytics", "Measurements"]
 )
 
 with overview:
@@ -313,6 +314,9 @@ with simulator:
             "same selected scenario. Some strategies may be more reliable "
             "but require more retries or virtual waiting."
         )
+
+with analytics:
+    render_advanced_analytics(filtered, RESULTS_DIR)
 
 with detail:
     st.subheader("Saved measurements")
