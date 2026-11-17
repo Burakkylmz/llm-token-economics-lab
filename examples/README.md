@@ -1,5 +1,10 @@
 # Reproducible experiment examples
 
+For the exact statistical formulas, observed denominators and interpretation
+limits, see [Benchmark Methodology](../docs/benchmark-methodology.md).
+For raw-file mappings, normalized field types and report JSON keys, see
+[Data Dictionary](../docs/data-dictionary.md).
+
 These examples are **offline** and require no Groq API key. They show how to
 run Lab07 with a fixed seed, collect an existing saved run, and create
 auditable Markdown and JSON benchmark reports.

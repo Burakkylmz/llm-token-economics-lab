@@ -98,7 +98,9 @@ root filesystem. This configuration is **not** hardened for public hosting.
   configuration and git commit improves reproducibility. Generated run IDs,
   manifest wall-clock timestamps and output paths vary naturally.
 - Compare saved results only within matched run/scenario/workload groups.
-  See [benchmark examples](../examples/README.md).
+  See [benchmark examples](../examples/README.md), the
+   [benchmark methodology](benchmark-methodology.md), and the
+   [data dictionary](data-dictionary.md).
 - `tests/` contains deterministic offline/unit tests; live integration
   tests are excluded from normal CI by the `integration` pytest marker.
 - GitHub Actions includes offline pytest, Ruff/mypy, coverage, security
