@@ -164,11 +164,12 @@ def _manifest_version(run_dir: Path, result: ValidationResult) -> dict:
         result.issue("error", "invalid_manifest", "experiment_manifest.json")
         return {}
 
-    declared = manifest.get(VERSION_FIELD)
-    if declared is None:
+    if VERSION_FIELD not in manifest:
         result.compatibility = "legacy_unversioned"
         result.issue("warning", "unversioned_manifest", "experiment_manifest.json")
-    elif type(declared) is not int or declared < 1:
+        return manifest
+    declared = manifest[VERSION_FIELD]
+    if type(declared) is not int or declared < 1:
         result.compatibility = "unsupported"
         result.issue("error", "invalid_contract_version", "experiment_manifest.json", field=VERSION_FIELD)
     elif declared != NORMALIZED_CONTRACT_VERSION:
