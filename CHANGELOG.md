@@ -9,6 +9,8 @@ Do not add a release tag before maintainers approve a version and release plan.
 
 ### Added
 - Architecture and explicit runtime/data-boundary documentation.
+- Benchmark Methodology and Data Dictionary with verified field mappings,
+  worked calculation examples, and documentation-to-code contract tests.
 - Reproducible offline Lab07 examples for PowerShell and Bash.
 - Read-only benchmark reporter for existing saved measurements in Markdown
   and JSON. Reports retain comparable workload groups and observed sample
