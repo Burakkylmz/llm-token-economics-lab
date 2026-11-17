@@ -30,6 +30,8 @@ VALUE_UNITS = {
     "total_tokens": "tokens / measured record",
     "estimated_cost_usd": "estimated USD / measured record",
     "latency_ms": "milliseconds / measured record",
+    "latency_p50_ms": "milliseconds (nearest-rank p50)",
+    "latency_p95_ms": "milliseconds (nearest-rank p95)",
     "retry_count": "simulated retries / client",
     "rate_limit_response_count": "simulated HTTP 429 responses / client",
     "total_scheduled_wait_seconds": "virtual seconds / client",
@@ -72,6 +74,8 @@ def _difference(
     )
     delta = (candidate - baseline) if present else None
     relative = 100 * delta / abs(baseline) if present and baseline != 0 else None
+    if relative is not None and not math.isfinite(relative):
+        relative = None
     return {
         "unit": unit,
         "baseline": baseline if present or _is_finite(baseline) else None,
@@ -145,6 +149,11 @@ def compare_benchmark(
         left, right = baseline["metrics"][key], candidate["metrics"][key]
         metrics[key] = _difference(
             left["mean"], right["mean"], left["observed"], right["observed"], VALUE_UNITS[key]
+        )
+    for key, percentile in (("latency_p50_ms", "p50"), ("latency_p95_ms", "p95")):
+        left, right = baseline["metrics"]["latency_ms"], candidate["metrics"]["latency_ms"]
+        metrics[key] = _difference(
+            left[percentile], right[percentile], left["observed"], right["observed"], VALUE_UNITS[key]
         )
 
     notes = [
