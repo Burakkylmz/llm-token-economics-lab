@@ -222,6 +222,23 @@ invariants. It never mutates original result files and does not run
 automatically when opening the Dashboard. See
 [Schema Evolution Policy](schema-evolution.md) for future migrations.
 
+## Comparison report format (PR #15)
+
+The offline [Comparison Engine](experiment-comparison.md) publishes
+`comparison_report_version = 1`. Its JSON contains one `lab` and
+`run_id`, a shared `context` (experiment, source, scenario, cost
+basis), baseline/candidate condition/model/record counts, a
+`model_difference_acknowledged` flag, `simulated`, descriptive
+`metrics` and interpretation `notes`.
+
+Each metric contains `unit`, `baseline`, `candidate`,
+`baseline_observed`, `candidate_observed`, `absolute_delta`,
+`relative_delta_percent`, and `percentage_point_delta`.
+Comparison metrics use the six benchmark numeric means, success rate,
+answer accuracy, and latency p50/p95. `null` means unavailable
+or undefined (including relative percentage with zero baseline).
+These are independent summary groups, not request-level pairs.
+
 ## Contract boundaries / migration status
 
 - The data dictionary is **versioned by the Git commit that contains
