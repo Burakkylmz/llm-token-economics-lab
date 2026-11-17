@@ -28,6 +28,25 @@ jobs:
         run: docker compose build lab-runner dashboard
       - name: Generate offline Lab07 results through existing CLI
         run: docker compose run --rm lab-runner lab07 all
+      - name: Validate generated versioned Lab07 measurements offline
+        run: |
+          set -euo pipefail
+          run_id=$(python -c "from pathlib import Path; print(sorted(p.name for p in Path('results/lab07_rate_limiting').iterdir() if p.is_dir())[-1])")
+          docker compose run --rm --entrypoint uv lab-runner run python -m lab_core.experiment_validation \
+            --experiment lab07_rate_limiting --run-id "$run_id" --strict \
+            --format json --output results/validation-reports/docker-smoke.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("results/validation-reports/docker-smoke.json").read_text(encoding="utf-8"))
+          assert report["valid"], report["diagnostics"]
+          assert report["compatibility"] == "v1"
+          assert report["declared_normalized_contract_version"] == 1
+          assert report["records_checked"] > 0
+          assert report["errors"] == 0 and report["warnings"] == 0
+          print("Validated versioned offline run:", report["run_id"], "records:", report["records_checked"])
+          PY
       - name: Generate and check offline benchmark report
         run: |
           set -euo pipefail
