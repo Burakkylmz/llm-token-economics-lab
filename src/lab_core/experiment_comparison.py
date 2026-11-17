@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Any
 
 from lab_core.benchmark_report import (
-    GROUP_KEYS,
     LABS,
     NUMERIC_FIELDS,
     build_benchmark,
