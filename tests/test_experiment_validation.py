@@ -93,6 +93,19 @@ def test_unsupported_or_malformed_versions_fail_closed(tmp_path, version, expect
     assert result.record_count == 0  # never fall back silently to unversioned
 
 
+def test_explicit_null_version_is_invalid_not_legacy(tmp_path):
+    run = make_run(tmp_path, manifest_version=1)
+    (run / "experiment_manifest.json").write_text(
+        '{"normalized_contract_version": null}', encoding="utf-8"
+    )
+    result = validate_run(
+        tmp_path / "results", experiment="lab07_rate_limiting", run_id="one-run"
+    )
+    assert not result.to_report()["valid"]
+    assert "invalid_contract_version" in codes(result)
+    assert "unversioned_manifest" not in codes(result)
+
+
 def test_missing_manifest_is_legacy_with_warning(tmp_path):
     make_run(tmp_path, write_manifest=False)
     report = validate_run(tmp_path / "results", experiment="lab07_rate_limiting", run_id="one-run")
@@ -263,6 +276,35 @@ def test_report_diagnostics_bounded(tmp_path):
     assert len(report["diagnostics"]) == MAX_ISSUES
     assert report["diagnostics_truncated"] == 10
     assert report["valid"] is False  # truncation requires investigation
+
+
+def test_machine_readable_normalized_schema_matches_validator_fields():
+    from lab_core.dashboard_data import EXPORT_COLUMNS
+    from lab_core.experiment_validation import (
+        BOOLEAN_FIELDS, INTEGER_FIELDS, NUMBER_FIELDS, OPTIONAL_FIELDS, TEXT_FIELDS,
+    )
+
+    schema_path = Path(__file__).resolve().parents[1] / "schemas" / "normalized-measurement-v1.schema.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    assert schema["type"] == "object"
+    assert schema["additionalProperties"] is False
+    assert schema["$schema"].endswith("2020-12/schema")
+    assert set(schema["required"]) == set(EXPORT_COLUMNS)
+    assert set(schema["properties"]) == set(EXPORT_COLUMNS)
+    for name in EXPORT_COLUMNS:
+        if name in TEXT_FIELDS:
+            typ = "string"
+        elif name in BOOLEAN_FIELDS:
+            typ = "boolean"
+        elif name in INTEGER_FIELDS:
+            typ = "integer"
+        else:
+            assert name in NUMBER_FIELDS
+            typ = "number"
+        expected = [typ, "null"] if name in OPTIONAL_FIELDS else typ
+        assert schema["properties"][name]["type"] == expected
+        if typ in ("integer", "number"):
+            assert schema["properties"][name]["minimum"] == 0
 
 
 def test_new_lab07_manifests_declare_normalized_contract_version():
