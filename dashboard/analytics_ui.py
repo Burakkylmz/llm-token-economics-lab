@@ -116,9 +116,13 @@ def render_advanced_analytics(records: list[dict], results_dir: Path) -> None:
 
     # Gate the selected saved input on the current offline validator. Never
     # mutate or auto-repair the run; warn on legacy/unversioned input.
-    validation = validate_run(
-        results_dir, experiment=context[0], run_id=run_id,
-    )
+    try:
+        validation = validate_run(
+            results_dir, experiment=context[0], run_id=run_id,
+        )
+    except ValueError as exc:
+        st.error(f"Unable to validate selected saved run: {exc}")
+        return
     status = validation.to_report()
     if not status["valid"]:
         st.error(
