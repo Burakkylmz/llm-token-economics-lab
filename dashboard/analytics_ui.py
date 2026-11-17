@@ -6,6 +6,7 @@ lives in independently tested shared code, not Streamlit callbacks.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
